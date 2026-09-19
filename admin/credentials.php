@@ -67,18 +67,20 @@ $users = $result['rows'];
 
 $pageTitle = 'Log In Credentials';
 include __DIR__ . '/../includes/header.php';
-?>
-<div class="page-header">
-  <div>
-    <h1>Log In Credentials</h1>
-    <p class="text-muted">Manage user login credentials and authentication.</p>
-  </div>
-</div>
+require_once __DIR__ . '/../includes/module_tabs.php';
+require_once __DIR__ . '/../includes/page_header.php';
+render_page_header('bi-person-fill', 'User Management', 'Register accounts, manage login credentials, and assign roles.');
+render_module_tabs([
+  ['key' => 'register', 'label' => 'Register Account', 'href' => '/admin/users.php'],
+  ['key' => 'credentials', 'label' => 'Login Credentials', 'href' => '/admin/credentials.php'],
+  ['key' => 'manage', 'label' => 'Manage Tenants', 'href' => '/admin/manage-tenants.php'],
+], 'credentials'); ?>
 
 <div class="panel">
   <div class="panel-header">
     <h2>System Users</h2>
     <form class="search-box" method="get">
+      <i class="bi bi-search"></i>
       <input type="search" name="q" value="<?= clean($search) ?>" placeholder="Search by name or email…" class="form-control form-control-sm">
     </form>
   </div>

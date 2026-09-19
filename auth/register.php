@@ -6,7 +6,7 @@ if (is_logged_in()) {
 }
 
 $errors = [];
-$old = ['first_name' => '', 'last_name' => '', 'email' => '', 'phone' => '', 'age' => ''];
+$old = ['first_name' => '', 'last_name' => '', 'email' => '', 'phone' => '', 'age' => '', 'tenant_type' => 'Student'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
@@ -16,6 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $old['email']      = str_input($_POST, 'email');
     $old['phone']      = str_input($_POST, 'phone');
     $old['age']        = str_input($_POST, 'age');
+    $old['tenant_type'] = in_array($_POST['tenant_type'] ?? '', ['Student', 'Employee'], true) ? $_POST['tenant_type'] : 'Student';
     $password          = str_input($_POST, 'password', '', false);
     $confirm           = $_POST['confirm_password'] ?? '';
     $emergency_contact = str_input($_POST, 'emergency_contact');
@@ -60,10 +61,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $userId = (int) $db->lastInsertId();
 
                 $stmt2 = $db->prepare(
-                    'INSERT INTO tenants (user_id, status, approval_status, emergency_contact, emergency_phone)
-                     VALUES (?, "Pending", "Pending", ?, ?)'
+                    'INSERT INTO tenants (user_id, status, approval_status, tenant_type, emergency_contact, emergency_phone)
+                     VALUES (?, "Pending", "Pending", ?, ?, ?)'
                 );
-                $stmt2->execute([$userId, $emergency_contact ?: null, $emergency_phone ?: null]);
+                $stmt2->execute([$userId, $old['tenant_type'], $emergency_contact ?: null, $emergency_phone ?: null]);
+                $tenantId = (int) $db->lastInsertId();
+
+                log_activity($db, 'tenant_registered', $old['first_name'] . ' ' . $old['last_name'] . ' registered as a new tenant', $tenantId);
 
                 $db->commit();
                 flash('success', 'Account created! An admin needs to review and approve your application before your dashboard unlocks.');
@@ -123,6 +127,13 @@ include __DIR__ . '/../includes/header.php';
             <label class="form-label">Age <span class="text-muted">(optional)</span></label>
             <input type="number" min="16" max="100" name="age" class="form-control" value="<?= clean($old['age']) ?>">
           </div>
+        </div>
+        <div class="mb-3">
+          <label class="form-label">Tenant Type</label>
+          <select name="tenant_type" class="form-select">
+            <option value="Student" <?= $old['tenant_type'] === 'Student' ? 'selected' : '' ?>>Student</option>
+            <option value="Employee" <?= $old['tenant_type'] === 'Employee' ? 'selected' : '' ?>>Employee</option>
+          </select>
         </div>
         <div class="row g-3 mt-0">
           <div class="col-md-6">

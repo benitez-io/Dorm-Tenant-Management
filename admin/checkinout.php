@@ -17,22 +17,28 @@ $result = paginate(
      JOIN users u ON u.user_id = t.user_id
      LEFT JOIN dorm_rooms r ON r.room_id = t.room_id
      WHERE t.status IN ('Active','Checked Out')
-<<<<<<< HEAD
        AND t.tenant_id NOT IN (SELECT tenant_id FROM dismissed_records WHERE page = 'checkinout')
      ORDER BY FIELD(t.status,'Active','Checked Out'), t.checkin_date DESC",
     "SELECT COUNT(*) c FROM tenants t WHERE t.status IN ('Active','Checked Out')
        AND t.tenant_id NOT IN (SELECT tenant_id FROM dismissed_records WHERE page = 'checkinout')"
-=======
-     ORDER BY FIELD(t.status,'Active','Checked Out'), t.checkin_date DESC",
-    "SELECT COUNT(*) c FROM tenants t WHERE t.status IN ('Active','Checked Out')"
->>>>>>> origin/james
 );
 $records = $result['rows'];
 
 $pageTitle = 'Check-in / Check-out Monitor';
 include __DIR__ . '/../includes/header.php';
-?>
-<div class="page-header"><div><h1>Check-in / Check-out Monitor</h1><p class="text-muted">Track tenant check-in and check-out dates with key return status.</p></div></div>
+require_once __DIR__ . '/../includes/module_tabs.php';
+require_once __DIR__ . '/../includes/page_header.php';
+render_page_header(
+    'bi-people-fill',
+    'Tenant Management',
+    'Review applications, track tenant status, and manage check-in/check-out.',
+    '<a href="' . BASE_URL . '/admin/users.php" class="btn btn-maroon"><i class="bi bi-plus-lg"></i> New Application</a>'
+);
+render_module_tabs([
+  ['key' => 'registration', 'label' => 'Registration & Approval', 'href' => '/admin/tenants.php'],
+  ['key' => 'status', 'label' => 'Track Status', 'href' => '/admin/tenant-status.php'],
+  ['key' => 'checkin', 'label' => 'Check-in / Check-out', 'href' => '/admin/checkinout.php'],
+], 'checkin'); ?>
 
 <div class="stat-grid stat-grid-3">
   <div class="stat-card"><div class="stat-card-body"><div class="stat-label">Currently Checked In</div><div class="stat-value"><?= $checkedIn ?></div></div><div class="stat-icon stat-icon-outline"><i class="bi bi-box-arrow-in-right"></i></div></div>
@@ -41,7 +47,6 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <div class="panel mt-2">
-<<<<<<< HEAD
   <div class="panel-header">
     <h2>All Records</h2>
     <?php if ($records): ?>
@@ -57,9 +62,6 @@ include __DIR__ . '/../includes/header.php';
     </div>
     <?php endif; ?>
   </div>
-=======
-  <div class="panel-header"><h2>All Records</h2></div>
->>>>>>> origin/james
   <div class="table-responsive">
     <table class="table app-table align-middle">
       <thead><tr><th>Tenant</th><th>Room</th><th>Check-in Date</th><th>Check-out Date</th><th>Key Return</th><th>Status</th><th class="text-end">Actions</th></tr></thead>

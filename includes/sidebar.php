@@ -8,55 +8,21 @@ if (!defined('BASE_URL')) { http_response_code(403); exit('Direct access not per
  * The real access control still happens in require_role() on each
  * page; this is just what makes the UI match that.
  *
- * Admin nav is grouped with collapsible sub-items, and each sub-item
- * is its own page — matching the prototype's navigation one-for-one.
- * A few sub-items intentionally share a page where the prototype's
- * own screens do too (e.g. Property Management's three sub-items are
- * all the same Room Inventory screen, just highlighting a different
- * part of it).
+ * Admin navigation stays at one level. Module pages render their own
+ * persistent horizontal tabs below the page header.
  */
 $role = current_role();
 $here = $_SERVER['REQUEST_URI'] ?? '';
 
-// [icon, group label, [ [sub-label, path], ... ] ]
-$adminGroups = [
-    ['<i class="bi bi-person-fill"></i>', 'User Management', [
-        ['Register Account', '/admin/users.php'],
-        ['Log In Credentials', '/admin/credentials.php'],
-        ['Manage Tenants', '/admin/manage-tenants.php'],
-        ['Identify Role', '/admin/users.php'],
-    ]],
-    ['<i class="bi bi-building"></i>', 'Property Management', [
-        ['Add/Update Dorm Info', '/admin/rooms.php'],
-        ['Assign Tenants', '/admin/rooms.php'],
-        ['Monitor Availability', '/admin/rooms.php'],
-    ]],
-    ['<i class="bi bi-people-fill"></i>', 'Tenant Management', [
-        ['Tenant Registration/Approval', '/admin/tenants.php'],
-        ['Track Status', '/admin/tenant-status.php'],
-        ['Monitor Check-In/Check-out', '/admin/checkinout.php'],
-    ]],
-    ['<i class="bi bi-credit-card-fill"></i>', 'Payment & Contract Management', [
-        ['Track Payments', '/admin/payments.php'],
-        ['Manage Contracts', '/admin/payments.php'],
-        ['Monitor Expirations', '/admin/payments.php'],
-    ]],
-    ['<i class="bi bi-tools"></i>', 'Maintenance Management', [
-        ['View Requests', '/admin/maintenance.php'],
-        ['Assign Tasks', '/admin/maintenance.php'],
-        ['Track Status', '/admin/maintenance.php'],
-    ]],
-    ['<i class="bi bi-bell-fill"></i>', 'Notification Management', [
-        ['Send Announcements', '/admin/notifications.php'],
-        ['Send Payment Reminders', '/admin/notifications.php'],
-        ['Send Expiry Alerts', '/admin/notifications.php'],
-    ]],
-    ['<i class="bi bi-graph-up-arrow"></i>', 'Reports & Analytics', [
-        ['Print Occupancy', '/admin/reports.php#occupancy'],
-        ['Print Payments', '/admin/reports.php#payment'],
-        ['Print Tenants', '/admin/reports.php#tenant'],
-        ['Print Maintenance', '/admin/reports.php#maintenance'],
-    ]],
+// [icon, module label, default page, related pages]
+$adminLinks = [
+  ['<i class="bi bi-person-fill"></i>', 'User Management', '/admin/users.php', ['/admin/users.php', '/admin/credentials.php', '/admin/manage-tenants.php']],
+  ['<i class="bi bi-people-fill"></i>', 'Tenant Management', '/admin/tenants.php', ['/admin/tenants.php', '/admin/tenant-status.php', '/admin/checkinout.php']],
+  ['<i class="bi bi-building"></i>', 'Property Management', '/admin/rooms.php', ['/admin/rooms.php']],
+  ['<i class="bi bi-credit-card-fill"></i>', 'Payments & Contracts', '/admin/payments.php', ['/admin/payments.php']],
+  ['<i class="bi bi-tools"></i>', 'Maintenance', '/admin/maintenance.php', ['/admin/maintenance.php']],
+  ['<i class="bi bi-bell-fill"></i>', 'Notifications', '/admin/notifications.php', ['/admin/notifications.php']],
+  ['<i class="bi bi-graph-up-arrow"></i>', 'Reports & Analytics', '/admin/reports.php', ['/admin/reports.php']],
 ];
 
 $tenantLinks = [
@@ -67,7 +33,7 @@ $tenantLinks = [
     ['<i class="bi bi-person-fill"></i>', 'Profile', '/tenant/profile.php'],
 ];
 ?>
-<nav class="sidebar" id="sidebar">
+<nav class="sidebar no-scrollbar" id="sidebar">
   <div class="sidebar-brand">
     <span class="brand-icon"><i class="bi bi-mortarboard-fill"></i></span>
     <?php if ($role === 'admin'): ?>
@@ -89,28 +55,17 @@ $tenantLinks = [
 
   <div class="sidebar-links">
   <?php if ($role === 'admin'): ?>
-    <div class="sidebar-section">Admin Functions</div>
+    <div class="sidebar-section">Overview</div>
     <a class="sidebar-link <?= active('/admin/dashboard.php') ?>" href="<?= BASE_URL ?>/admin/dashboard.php"><span class="nav-icon"><i class="bi bi-speedometer2"></i></span> Dashboard</a>
-    <?php foreach ($adminGroups as $i => $g):
-        [$icon, $label, $subs] = $g;
-        $groupPaths = array_unique(array_map(fn($s) => explode('#', $s[1])[0], $subs));
-        $groupActive = false;
-        foreach ($groupPaths as $gp) { if (strpos($here, $gp) !== false) { $groupActive = true; break; } }
-        $collapseId = 'grp' . $i;
+    <?php $sectionLabels = [0 => 'Management', 3 => 'Finance', 4 => 'Operations', 6 => 'Reports']; ?>
+    <?php foreach ($adminLinks as $index => [$icon, $label, $page, $relatedPages]):
+        $moduleActive = false;
+        foreach ($relatedPages as $relatedPage) {
+            if (strpos($here, $relatedPage) !== false) { $moduleActive = true; break; }
+        }
+        if (isset($sectionLabels[$index])): ?><div class="sidebar-section"><?= clean($sectionLabels[$index]) ?></div><?php endif;
     ?>
-      <button class="nav-group-toggle <?= $groupActive ? 'active-group' : '' ?>" type="button"
-        data-bs-toggle="collapse" data-bs-target="#<?= $collapseId ?>" aria-expanded="<?= $groupActive ? 'true' : 'false' ?>">
-        <span class="toggle-left"><span class="nav-icon"><?= $icon ?></span> <?= clean($label) ?></span>
-        <span class="chevron">▾</span>
-      </button>
-      <div class="collapse sidebar-subnav <?= $groupActive ? 'show' : '' ?>" id="<?= $collapseId ?>">
-        <?php foreach ($subs as [$subLabel, $subPath]):
-            $subPageOnly = explode('#', $subPath)[0];
-            $subActive = strpos($here, $subPageOnly) !== false;
-        ?>
-          <a class="subnav-link <?= $subActive ? 'active' : '' ?>" href="<?= BASE_URL . $subPath ?>"><?= clean($subLabel) ?></a>
-        <?php endforeach; ?>
-      </div>
+      <a class="sidebar-link <?= $moduleActive ? 'active' : '' ?>" href="<?= BASE_URL . $page ?>"><span class="nav-icon"><?= $icon ?></span> <?= clean($label) ?></a>
     <?php endforeach; ?>
 
   <?php elseif ($role === 'tenant'): ?>

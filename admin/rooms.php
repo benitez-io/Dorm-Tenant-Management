@@ -86,7 +86,6 @@ $unassignedTenants = $db->query("
     ORDER BY u.first_name
 ")->fetchAll();
 
-<<<<<<< HEAD
 // Coming from the "Assign Room" shortcut on Tenant Approval? Pre-select
 // them in the modal once the admin picks a room, instead of making them
 // find the name again in the dropdown.
@@ -98,15 +97,26 @@ foreach ($unassignedTenants as $t) {
     }
 }
 
-=======
->>>>>>> origin/james
+$activeTab = str_input($_GET, 'tab') ?: 'rooms';
+if (!in_array($activeTab, ['rooms', 'assign', 'availability'], true)) {
+    $activeTab = 'rooms';
+}
+
 $pageTitle = 'Property Management';
 include __DIR__ . '/../includes/header.php';
-?>
-<div class="page-header">
-  <div><h1>Room Inventory</h1><p class="text-muted">Monitor room availability and assign tenants.</p></div>
-  <button type="button" class="btn btn-maroon" data-bs-toggle="modal" data-bs-target="#roomModal">+ Add Room</button>
-</div>
+require_once __DIR__ . '/../includes/module_tabs.php';
+require_once __DIR__ . '/../includes/page_header.php';
+render_page_header(
+    'bi-building',
+    'Property Management',
+    'Manage dorm rooms, assign tenants, and monitor availability.',
+    '<button type="button" class="btn btn-maroon" data-bs-toggle="modal" data-bs-target="#roomModal"><i class="bi bi-plus-lg"></i> Add Room</button>'
+);
+render_module_tabs([
+  ['key' => 'rooms', 'label' => 'Room Inventory', 'href' => '/admin/rooms.php?tab=rooms#rooms'],
+  ['key' => 'assign', 'label' => 'Assign Tenants', 'href' => '/admin/rooms.php?tab=assign#rooms'],
+  ['key' => 'availability', 'label' => 'Monitor Availability', 'href' => '/admin/rooms.php?tab=availability#rooms'],
+], $activeTab); ?>
 
 <div class="stat-grid stat-grid-4">
   <div class="stat-card"><div class="stat-card-body"><div class="stat-label">Total Rooms</div><div class="stat-value"><?= $totalRooms ?></div></div><div class="stat-icon stat-icon-outline"><i class="bi bi-building"></i></div></div>
@@ -115,59 +125,123 @@ include __DIR__ . '/../includes/header.php';
   <div class="stat-card"><div class="stat-card-body"><div class="stat-label">Occupancy</div><div class="stat-value"><?= $occupancyRate ?>%</div></div><div class="stat-icon stat-icon-outline"><i class="bi bi-building"></i></div></div>
 </div>
 
-<<<<<<< HEAD
-<?php if ($preselectTenant): ?>
+<?php if ($preselectTenant && $activeTab === 'assign'): ?>
   <div class="callout callout-info mt-2">
     <i class="bi bi-info-circle-fill"></i>
     <div>Assigning a room for <strong><?= clean($preselectTenant['first_name'] . ' ' . $preselectTenant['last_name']) ?></strong> — click <strong>Assign</strong> on any available room below.</div>
   </div>
 <?php endif; ?>
 
-=======
->>>>>>> origin/james
-<div class="panel mt-2" id="rooms">
-  <div class="panel-header"><h2>Room Grid</h2></div>
-  <?php
-    $byFloor = [];
-    foreach ($rooms as $r) { $byFloor[(int) $r['floor_number']][] = $r; }
-    krsort($byFloor);
-  ?>
-  <?php foreach ($byFloor as $floorNum => $floorRooms): ?>
-    <div class="floor-group">
-      <div class="floor-label">Floor <?= $floorNum ?></div>
-      <div class="room-grid">
-        <?php foreach ($floorRooms as $r): ?>
-          <div class="room-card">
-            <div class="room-card-top">
-              <strong>Room <?= clean($r['room_number']) ?></strong>
-              <span class="door-icon"><i class="bi bi-door-open"></i></span>
-            </div>
-            <div class="text-muted small"><?= clean($r['room_type']) ?></div>
-            <div class="room-card-rate"><?= peso($r['monthly_rate']) ?><span class="text-muted fw-normal">/mo</span></div>
-            <div class="text-muted small mt-1">Capacity: <?= (int) $r['capacity'] ?></div>
-            <?php if ($r['first_name']): ?>
-              <div class="small mt-2"><i class="bi bi-person-fill"></i> <?= clean($r['first_name'] . ' ' . $r['last_name']) ?></div>
-            <?php elseif ($r['status'] === 'Available'): ?>
-              <div class="room-card-actions">
-                <button type="button" class="btn btn-sm btn-maroon" data-bs-toggle="modal" data-bs-target="#assignModal"
-                  data-room-id="<?= $r['room_id'] ?>" data-room-number="<?= clean($r['room_number']) ?>">Assign</button>
-              </div>
-            <?php else: ?>
-              <div class="small mt-2"><span class="badge badge-<?= status_badge_class($r['status']) ?>"><?= clean($r['status']) ?></span></div>
-            <?php endif; ?>
-            <div class="room-card-actions mt-2">
-              <button type="button" class="btn btn-sm btn-outline-maroon edit-room-btn" data-bs-toggle="modal" data-bs-target="#roomModal"
-                data-id="<?= $r['room_id'] ?>" data-number="<?= clean($r['room_number']) ?>" data-type="<?= clean($r['room_type']) ?>"
-                data-capacity="<?= (int) $r['capacity'] ?>" data-rate="<?= clean((string) $r['monthly_rate']) ?>" data-floor="<?= (int) $r['floor_number'] ?>"
-                data-description="<?= clean($r['description'] ?? '') ?>">Edit</button>
-            </div>
+<?php
+  $byFloor = [];
+  foreach ($rooms as $r) { $byFloor[(int) $r['floor_number']][] = $r; }
+  krsort($byFloor);
+
+  function render_room_card(array $r): void {
+    ?>
+    <div class="room-card">
+      <div class="room-card-top">
+        <strong>Room <?= clean($r['room_number']) ?></strong>
+        <span class="door-icon"><i class="bi bi-door-open"></i></span>
+      </div>
+      <div class="text-muted small"><?= clean($r['room_type']) ?></div>
+      <div class="room-card-rate"><?= peso($r['monthly_rate']) ?><span class="text-muted fw-normal">/mo</span></div>
+      <div class="text-muted small mt-1">Capacity: <?= (int) $r['capacity'] ?></div>
+      <?php if ($r['first_name']): ?>
+        <div class="small mt-2"><i class="bi bi-person-fill"></i> <?= clean($r['first_name'] . ' ' . $r['last_name']) ?></div>
+      <?php elseif ($r['status'] === 'Available'): ?>
+        <div class="room-card-actions">
+          <button type="button" class="btn btn-sm btn-maroon" data-bs-toggle="modal" data-bs-target="#assignModal"
+            data-room-id="<?= $r['room_id'] ?>" data-room-number="<?= clean($r['room_number']) ?>">Assign</button>
+        </div>
+      <?php else: ?>
+        <div class="small mt-2"><span class="badge badge-<?= status_badge_class($r['status']) ?>"><?= clean($r['status']) ?></span></div>
+      <?php endif; ?>
+      <div class="room-card-actions mt-2">
+        <button type="button" class="btn btn-sm btn-outline-maroon edit-room-btn" data-bs-toggle="modal" data-bs-target="#roomModal"
+          data-id="<?= $r['room_id'] ?>" data-number="<?= clean($r['room_number']) ?>" data-type="<?= clean($r['room_type']) ?>"
+          data-capacity="<?= (int) $r['capacity'] ?>" data-rate="<?= clean((string) $r['monthly_rate']) ?>" data-floor="<?= (int) $r['floor_number'] ?>"
+          data-description="<?= clean($r['description'] ?? '') ?>">Edit</button>
+      </div>
+    </div>
+    <?php
+  }
+?>
+
+<?php if ($activeTab === 'rooms'): ?>
+  <div class="panel mt-2" id="rooms">
+    <div class="panel-header"><h2>Room Grid</h2></div>
+    <?php foreach ($byFloor as $floorNum => $floorRooms): ?>
+      <div class="floor-group">
+        <div class="floor-label">Floor <?= $floorNum ?></div>
+        <div class="room-grid">
+          <?php foreach ($floorRooms as $r): render_room_card($r); endforeach; ?>
+        </div>
+      </div>
+    <?php endforeach; ?>
+    <?php if (!$rooms): ?><p class="text-muted text-center py-4">No rooms yet — add your first one above.</p><?php endif; ?>
+  </div>
+
+<?php elseif ($activeTab === 'assign'): ?>
+  <div class="row g-4 mt-0" id="rooms">
+    <div class="col-lg-8">
+      <div class="panel">
+        <div class="panel-header"><h2>Available Rooms</h2><span class="text-muted small"><?= $available ?> ready to assign</span></div>
+        <?php $availableRooms = array_filter($rooms, fn($r) => $r['status'] === 'Available'); ?>
+        <?php if (!$availableRooms): ?><p class="text-muted text-center py-4">No available rooms right now.</p><?php endif; ?>
+        <div class="room-grid">
+          <?php foreach ($availableRooms as $r): render_room_card($r); endforeach; ?>
+        </div>
+      </div>
+    </div>
+    <div class="col-lg-4">
+      <div class="panel">
+        <div class="panel-header"><h2>Tenants Waiting</h2></div>
+        <?php if (!$unassignedTenants): ?><p class="text-muted mb-0">No approved tenants are waiting for a room right now.</p><?php endif; ?>
+        <?php foreach ($unassignedTenants as $t): ?>
+          <div class="detail-row"><span><i class="bi bi-person-fill"></i> <?= clean($t['first_name'] . ' ' . $t['last_name']) ?></span></div>
+        <?php endforeach; ?>
+      </div>
+    </div>
+  </div>
+
+<?php else: /* availability */ ?>
+  <div class="row g-4 mt-0" id="rooms">
+    <div class="col-lg-6">
+      <div class="panel">
+        <div class="panel-header"><h2>Availability by Floor</h2></div>
+        <?php foreach ($byFloor as $floorNum => $floorRooms):
+          $floorAvailable = count(array_filter($floorRooms, fn($r) => $r['status'] === 'Available'));
+          $floorTotal = count($floorRooms);
+          $pct = $floorTotal > 0 ? round($floorAvailable / $floorTotal * 100) : 0;
+        ?>
+          <div class="mix-bar-row">
+            <div class="mix-bar-label"><span>Floor <?= $floorNum ?></span><span class="text-muted"><?= $floorAvailable ?> / <?= $floorTotal ?> available</span></div>
+            <div class="mix-bar-track"><div class="mix-bar-fill" style="width:<?= $pct ?>%;background:#2fa15c"></div></div>
           </div>
         <?php endforeach; ?>
       </div>
     </div>
-  <?php endforeach; ?>
-  <?php if (!$rooms): ?><p class="text-muted text-center py-4">No rooms yet — add your first one above.</p><?php endif; ?>
-</div>
+    <div class="col-lg-6">
+      <div class="panel">
+        <div class="panel-header"><h2>Availability by Room Type</h2></div>
+        <?php
+          $byType = [];
+          foreach ($rooms as $r) {
+            $byType[$r['room_type']]['total'] = ($byType[$r['room_type']]['total'] ?? 0) + 1;
+            $byType[$r['room_type']]['available'] = ($byType[$r['room_type']]['available'] ?? 0) + ($r['status'] === 'Available' ? 1 : 0);
+          }
+        ?>
+        <?php foreach ($byType as $type => $counts): $pct = $counts['total'] > 0 ? round($counts['available'] / $counts['total'] * 100) : 0; ?>
+          <div class="mix-bar-row">
+            <div class="mix-bar-label"><span><?= clean($type) ?></span><span class="text-muted"><?= $counts['available'] ?> / <?= $counts['total'] ?> available</span></div>
+            <div class="mix-bar-track"><div class="mix-bar-fill" style="width:<?= $pct ?>%;background:var(--maroon)"></div></div>
+          </div>
+        <?php endforeach; ?>
+      </div>
+    </div>
+  </div>
+<?php endif; ?>
 
 <!-- Add/Edit Room Modal -->
 <div class="modal fade" id="roomModal" tabindex="-1">
@@ -210,11 +284,7 @@ include __DIR__ . '/../includes/header.php';
             <p class="text-muted">No approved tenants are waiting for a room right now. Approve applicants first in <a href="<?= BASE_URL ?>/admin/tenants.php">Tenant Management</a>.</p>
           <?php else: ?>
             <label class="form-label">Tenant</label>
-<<<<<<< HEAD
             <select class="form-select" name="tenant_id" id="assign_tenant_id" required>
-=======
-            <select class="form-select" name="tenant_id" required>
->>>>>>> origin/james
               <option value="">Choose a tenant…</option>
               <?php foreach ($unassignedTenants as $t): ?>
                 <option value="<?= $t['tenant_id'] ?>"><?= clean($t['first_name'] . ' ' . $t['last_name']) ?></option>
@@ -249,14 +319,11 @@ document.getElementById('assignModal').addEventListener('show.bs.modal', functio
   const btn = e.relatedTarget;
   document.getElementById('assign_room_id').value = btn.dataset.roomId;
   document.getElementById('assign_room_number').textContent = btn.dataset.roomNumber;
-<<<<<<< HEAD
   const preselect = " . (int) ($preselectTenant['tenant_id'] ?? 0) . ";
   const tenantSelect = document.getElementById('assign_tenant_id');
   if (preselect && tenantSelect.querySelector('option[value=\"' + preselect + '\"]')) {
     tenantSelect.value = preselect;
   }
-=======
->>>>>>> origin/james
 });
 </script>";
 include __DIR__ . '/../includes/footer.php';

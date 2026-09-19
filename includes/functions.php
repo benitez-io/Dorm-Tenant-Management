@@ -38,7 +38,6 @@ function redirect(string $path): void
 }
 
 /**
-<<<<<<< HEAD
  * Builds a full scheme+host URL for a BASE_URL-relative path. Needed
  * for callback URLs handed to an external service (e.g. PayMongo's
  * success_url/cancel_url) — those can't be sent a host-relative path
@@ -51,8 +50,6 @@ function absolute_url(string $path): string
 }
 
 /**
-=======
->>>>>>> origin/james
  * Run a paginated SELECT. $baseSql must NOT include LIMIT/OFFSET —
  * this appends them. $countSql is the matching "how many rows total"
  * query (same WHERE clause, just COUNT(*) instead of the real
@@ -156,6 +153,35 @@ function peso($amount): string
     return '₱' . number_format((float) $amount, 2);
 }
 
+/** Human-readable "X minutes/hours/days ago" for a datetime string. */
+function time_ago(string $datetime): string
+{
+    $diff = time() - strtotime($datetime);
+    if ($diff < 60) return 'just now';
+    $mins = (int) floor($diff / 60);
+    if ($mins < 60) return $mins . ' minute' . ($mins === 1 ? '' : 's') . ' ago';
+    $hours = (int) floor($mins / 60);
+    if ($hours < 24) return $hours . ' hour' . ($hours === 1 ? '' : 's') . ' ago';
+    $days = (int) floor($hours / 24);
+    if ($days < 30) return $days . ' day' . ($days === 1 ? '' : 's') . ' ago';
+    $months = (int) floor($days / 30);
+    if ($months < 12) return $months . ' month' . ($months === 1 ? '' : 's') . ' ago';
+    $years = (int) floor($months / 12);
+    return $years . ' year' . ($years === 1 ? '' : 's') . ' ago';
+}
+
+// issue_title is picked from a fixed dropdown of trade-like values
+// (Plumbing, Electrical, HVAC / Air Conditioning, ...) — this buckets
+// it into the 3 broad categories used by admin dashboard/reporting
+// widgets, rather than adding a column that would just duplicate it.
+function maintenance_category_bucket(string $title): string
+{
+    $t = strtolower($title);
+    if (str_contains($t, 'electric')) return 'Electrical';
+    if (str_contains($t, 'plumb')) return 'Plumbing';
+    return 'General';
+}
+
 /** Turn a status string into a Bootstrap-ish badge class suffix. */
 function status_badge_class(string $status): string
 {
@@ -170,10 +196,7 @@ function status_badge_class(string $status): string
         'Reserved'    => 'info',
         'Expiring Soon' => 'warning',
         'Overdue'     => 'danger',
-<<<<<<< HEAD
-=======
         'Failed'      => 'danger',
->>>>>>> origin/james
         'Evicted'     => 'danger',
         'Rejected'    => 'danger',
         'Expired'     => 'danger',
@@ -269,8 +292,6 @@ function days_until(string $date): int
     $today  = new DateTime('today');
     return (int) $today->diff($target)->format('%r%a');
 }
-<<<<<<< HEAD
-=======
 
 /* =====================================================================
    Contract lifecycle helpers
@@ -498,4 +519,18 @@ function sync_pending_gcash_payments(PDO $db, int $tenantId): int
 
     return $confirmed;
 }
->>>>>>> origin/james
+
+/**
+ * Records one row in the "Recent Activity" feed shown on the Admin
+ * Dashboard. Never throws — a logging failure shouldn't take down the
+ * action that triggered it.
+ */
+function log_activity(PDO $db, string $type, string $description, ?int $tenantId = null): void
+{
+    try {
+        $db->prepare('INSERT INTO activity_log (activity_type, description, related_tenant_id) VALUES (?,?,?)')
+           ->execute([$type, $description, $tenantId]);
+    } catch (PDOException $e) {
+        error_log('log_activity failed: ' . $e->getMessage());
+    }
+}

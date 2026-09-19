@@ -4,14 +4,11 @@ require_role('admin');
 
 $db = get_db();
 
-<<<<<<< HEAD
-=======
 // Move leases whose end date has come and gone into 'Expired' (and
 // leases inside the 30-day window into 'Expiring Soon') before anything
 // on this page reads a contract_status.
 refresh_contract_statuses($db);
 
->>>>>>> origin/james
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
     $action = $_POST['action'] ?? '';
@@ -42,6 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $file = handle_upload('contract_file', 'contracts', ['pdf']);
                 $db->prepare('INSERT INTO contracts (tenant_id, room_id, monthly_rent, security_deposit, contract_start, contract_end, contract_file) VALUES (?,?,?,?,?,?,?)')
                    ->execute([$tenantId, $t['room_id'], $rent, $deposit, $start, $end, $file]);
+                log_activity($db, 'contract_created', 'New contract created for tenant #' . $tenantId, $tenantId);
                 flash('success', 'Contract created.');
             } catch (RuntimeException $e) {
                 flash('error', $e->getMessage());
@@ -66,12 +64,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $db->prepare('INSERT INTO payments (contract_id, tenant_id, payment_amount, payment_for_month, payment_date, due_date, payment_status, payment_method) VALUES (?,?,?,?,CURDATE(),CURDATE(),"Paid",?)')
                ->execute([$contractId, $tenantId, $amount, $forMonth, $method ?: 'Cash']);
+            log_activity($db, 'payment_recorded', 'Payment of ' . peso($amount) . ' recorded for ' . $forMonth, $tenantId);
             flash('success', 'Payment recorded.');
         }
     }
 
-<<<<<<< HEAD
-=======
     // ---- Renew / continue an existing lease ---------------------------
     // The contract row is REUSED rather than replaced: same contract_id,
     // new end date. That keeps every payment already recorded against
@@ -120,6 +117,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                  WHERE contract_id = ?
             ")->execute([$newEnd, $newRent, $contractId]);
 
+            log_activity($db, 'contract_renewed', $c['first_name'] . ' ' . $c['last_name'] . '\'s contract renewed through ' . date('M j, Y', strtotime($newEnd)), $c['tenant_id']);
             flash('success', $c['first_name'] . '\'s contract has been renewed through ' . date('F j, Y', strtotime($newEnd)) . '.');
 
             $subject = 'Your dorm contract has been renewed';
@@ -183,6 +181,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 $db->commit();
 
+                log_activity($db, 'contract_terminated', $c['first_name'] . ' ' . $c['last_name'] . '\'s contract was terminated', $c['tenant_id']);
                 flash('success', $c['first_name'] . '\'s contract has been terminated'
                     . ($alsoCheckOut ? ' and they have been checked out — Room ' . $c['room_number'] . ' is available again.' : '.'));
 
@@ -202,12 +201,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
->>>>>>> origin/james
     if ($action === 'verify_payment') {
         $paymentId = (int) ($_POST['payment_id'] ?? 0);
         $newStatus = $_POST['new_status'] ?? 'Paid';
+        $paymentRow = $db->prepare('SELECT tenant_id FROM payments WHERE payment_id = ?');
+        $paymentRow->execute([$paymentId]);
+        $paymentTenantId = $paymentRow->fetch()['tenant_id'] ?? null;
         $db->prepare('UPDATE payments SET payment_status = ?, payment_date = IF(? = "Paid", CURDATE(), payment_date) WHERE payment_id = ?')
            ->execute([$newStatus, $newStatus, $paymentId]);
+        log_activity($db, 'payment_verified', 'Payment #' . $paymentId . ' marked as ' . $newStatus, $paymentTenantId);
         flash('success', 'Payment marked as ' . $newStatus . '.');
     }
 
@@ -218,6 +220,37 @@ $paidTotal = (float) $db->query("SELECT COALESCE(SUM(payment_amount),0) t FROM p
 $pending   = $db->query("SELECT COUNT(*) c, COALESCE(SUM(payment_amount),0) t FROM payments WHERE payment_status='Pending'")->fetch();
 $overdue   = $db->query("SELECT COUNT(*) c, COALESCE(SUM(payment_amount),0) t FROM payments WHERE payment_status='Overdue'")->fetch();
 
+$activeTab = str_input($_GET, 'tab') ?: 'payments';
+if (!in_array($activeTab, ['payments', 'contracts', 'expirations'], true)) {
+    $activeTab = 'payments';
+}
+$search = str_input($_GET, 'q');
+
+$paymentStatusFilter = $_GET['status'] ?? 'all';
+if (!in_array($paymentStatusFilter, ['all', 'Paid', 'Pending', 'Overdue'], true)) {
+    $paymentStatusFilter = 'all';
+}
+$pWhere = [];
+$pParams = [];
+if ($paymentStatusFilter !== 'all') {
+    $pWhere[] = 'p.payment_status = ?';
+    $pParams[] = $paymentStatusFilter;
+}
+if ($activeTab === 'payments' && $search !== '') {
+    $pWhere[] = '(u.first_name LIKE ? OR u.last_name LIKE ? OR r.room_number LIKE ?)';
+    $like = "%$search%";
+    array_push($pParams, $like, $like, $like);
+}
+$pWhereSql = $pWhere ? 'WHERE ' . implode(' AND ', $pWhere) : '';
+
+$paymentStatusCounts = ['Paid' => 0, 'Pending' => 0, 'Overdue' => 0];
+foreach ($db->query("SELECT payment_status, COUNT(*) c FROM payments GROUP BY payment_status") as $row) {
+    if (isset($paymentStatusCounts[$row['payment_status']])) {
+        $paymentStatusCounts[$row['payment_status']] = (int) $row['c'];
+    }
+}
+$paymentTotalCount = array_sum($paymentStatusCounts);
+
 $paymentsResult = paginate(
     $db,
     "SELECT p.*, u.first_name, u.last_name, r.room_number
@@ -225,9 +258,14 @@ $paymentsResult = paginate(
      JOIN tenants t ON t.tenant_id = p.tenant_id
      JOIN users u ON u.user_id = t.user_id
      LEFT JOIN dorm_rooms r ON r.room_id = t.room_id
+     $pWhereSql
      ORDER BY FIELD(p.payment_status,'Pending','Overdue','Paid'), p.due_date DESC",
-    "SELECT COUNT(*) c FROM payments",
-    [],
+    "SELECT COUNT(*) c FROM payments p
+     JOIN tenants t ON t.tenant_id = p.tenant_id
+     JOIN users u ON u.user_id = t.user_id
+     LEFT JOIN dorm_rooms r ON r.room_id = t.room_id
+     $pWhereSql",
+    $pParams,
     15
 );
 $payments = $paymentsResult['rows'];
@@ -243,16 +281,15 @@ $contracts = $db->query("
     JOIN tenants t ON t.tenant_id = c.tenant_id
     JOIN users u ON u.user_id = t.user_id
     JOIN dorm_rooms r ON r.room_id = c.room_id
-<<<<<<< HEAD
-    ORDER BY c.contract_end ASC
-    LIMIT 30
-")->fetchAll();
-
-// Tenants with an active room but no *active* contract yet
-=======
     ORDER BY FIELD(c.contract_status,'Expired','Expiring Soon','Active','Terminated'), c.contract_end ASC
     LIMIT 30
 ")->fetchAll();
+
+if ($activeTab === 'contracts' && $search !== '') {
+    $contracts = array_values(array_filter($contracts, function ($c) use ($search) {
+        return stripos($c['first_name'] . ' ' . $c['last_name'] . ' ' . $c['room_number'], $search) !== false;
+    }));
+}
 
 // How many leases need a decision right now (expired, or expiring
 // inside the 30-day window). Counted across ALL contracts, not just the
@@ -268,20 +305,12 @@ $contractCounts = $db->query("
 // Tenants with an assigned room but no live contract yet. 'Expiring
 // Soon' counts as live — it's the same lease as 'Active', just inside
 // the warning window — so it can be renewed rather than duplicated.
->>>>>>> origin/james
 $contractableTenants = $db->query("
     SELECT t.tenant_id, u.first_name, u.last_name, r.room_number, r.monthly_rate
     FROM tenants t
     JOIN users u ON u.user_id = t.user_id
     JOIN dorm_rooms r ON r.room_id = t.room_id
     WHERE t.room_id IS NOT NULL
-<<<<<<< HEAD
-      AND t.tenant_id NOT IN (SELECT tenant_id FROM contracts WHERE contract_status = 'Active')
-    ORDER BY u.first_name
-")->fetchAll();
-
-$activeContracts = array_filter($contracts, fn($c) => $c['contract_status'] !== 'Terminated' && $c['contract_status'] !== 'Expired');
-=======
       AND t.tenant_id NOT IN (SELECT tenant_id FROM contracts WHERE contract_status IN ('Active','Expiring Soon'))
     ORDER BY u.first_name
 ")->fetchAll();
@@ -290,17 +319,28 @@ $activeContracts = array_filter($contracts, fn($c) => $c['contract_status'] !== 
 // often lands after the term is up. Only a terminated one is closed
 // to new payments.
 $activeContracts = array_filter($contracts, fn($c) => $c['contract_status'] !== 'Terminated');
->>>>>>> origin/james
+
+$headerActions = [
+    'payments'    => '<button type="button" class="btn btn-maroon" data-bs-toggle="modal" data-bs-target="#paymentModal"><i class="bi bi-plus-lg"></i> Record Payment</button>',
+    'contracts'   => '<button type="button" class="btn btn-maroon" data-bs-toggle="modal" data-bs-target="#contractModal"><i class="bi bi-upload"></i> Upload Contract</button>',
+    'expirations' => null,
+];
 
 $pageTitle = 'Payment & Contract Management';
 include __DIR__ . '/../includes/header.php';
-?>
-<div class="page-header">
-  <div><h1>Track Payments &amp; Contracts</h1><p class="text-muted">Monitor payment status and manage tenant contracts.</p></div>
-  <div>
-    <button type="button" class="btn btn-maroon" data-bs-toggle="modal" data-bs-target="#paymentModal">+ Record Payment</button>
-  </div>
-</div>
+require_once __DIR__ . '/../includes/module_tabs.php';
+require_once __DIR__ . '/../includes/page_header.php';
+render_page_header(
+    'bi-credit-card-fill',
+    'Payments & Contracts',
+    'Track payments, upload contracts, and monitor upcoming expirations.',
+    $headerActions[$activeTab]
+);
+render_module_tabs([
+  ['key' => 'payments', 'label' => 'Track Payments', 'href' => '/admin/payments.php?tab=payments'],
+  ['key' => 'contracts', 'label' => 'Manage Contracts', 'href' => '/admin/payments.php?tab=contracts'],
+  ['key' => 'expirations', 'label' => 'Expirations', 'href' => '/admin/payments.php?tab=expirations'],
+], $activeTab); ?>
 
 <div class="stat-grid stat-grid-3">
   <div class="stat-card"><div class="stat-card-body"><div class="stat-label">Collected This Month</div><div class="stat-value text-success"><?= peso($paidTotal) ?></div></div><div class="stat-icon stat-icon-outline"><i class="bi bi-check-lg"></i></div></div>
@@ -308,84 +348,77 @@ include __DIR__ . '/../includes/header.php';
   <div class="stat-card"><div class="stat-card-body"><div class="stat-label">Overdue</div><div class="stat-value text-danger"><?= $overdue['c'] ?></div><div class="stat-sub"><?= peso($overdue['t']) ?></div></div><div class="stat-icon stat-icon-outline">!</div></div>
 </div>
 
-<div class="row g-4 mt-1">
-  <div class="col-lg-7">
-    <div class="panel" id="payments">
-      <div class="panel-header"><h2>Payment Status</h2></div>
-      <div class="table-responsive">
-        <table class="table app-table align-middle">
-<<<<<<< HEAD
-          <thead><tr><th>Tenant</th><th>Month</th><th>Amount</th><th>Method</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
-          <tbody>
-          <?php if (!$payments): ?><tr><td colspan="6" class="text-center text-muted py-4">No payments recorded yet.</td></tr><?php endif; ?>
-=======
-          <thead><tr><th>Tenant</th><th>Month</th><th>Amount</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
-          <tbody>
-          <?php if (!$payments): ?><tr><td colspan="5" class="text-center text-muted py-4">No payments recorded yet.</td></tr><?php endif; ?>
->>>>>>> origin/james
-          <?php foreach ($payments as $p): ?>
-            <tr>
-              <td><?= clean($p['first_name'] . ' ' . $p['last_name']) ?><div class="text-muted small"><?= $p['room_number'] ? 'Room ' . clean($p['room_number']) : '' ?></div></td>
-              <td class="small"><?= clean($p['payment_for_month'] ?: '—') ?></td>
-              <td><?= peso($p['payment_amount']) ?></td>
-<<<<<<< HEAD
-              <td class="small">
-                <?php if (str_starts_with((string) $p['payment_method'], 'PayMongo')): ?>
-                  <span class="badge badge-info"><i class="bi bi-credit-card-fill"></i> <?= clean($p['payment_method']) ?></span>
-                <?php else: ?>
-                  <?= clean($p['payment_method'] ?: '—') ?>
-                <?php endif; ?>
-              </td>
-=======
->>>>>>> origin/james
-              <td><span class="badge badge-<?= status_badge_class($p['payment_status']) ?>"><?= clean($p['payment_status']) ?></span></td>
-              <td class="text-end">
-                <?php if ($p['payment_status'] !== 'Paid'): ?>
-                  <form method="post" class="d-inline"><?= csrf_field() ?><input type="hidden" name="action" value="verify_payment"><input type="hidden" name="payment_id" value="<?= $p['payment_id'] ?>"><input type="hidden" name="new_status" value="Paid"><button class="btn btn-sm btn-maroon">Mark Paid</button></form>
-                <?php else: ?>
-                  <span class="text-muted small"><?= clean(date('n/j/Y', strtotime($p['payment_date']))) ?></span>
-                <?php endif; ?>
-              </td>
-            </tr>
-          <?php endforeach; ?>
-          </tbody>
-        </table>
-      </div>
-      <?= pagination_links($paymentsResult['page'], $paymentsResult['totalPages']) ?>
+<?php if ($activeTab === 'payments'): ?>
+<div class="panel mt-2" id="payments">
+  <div class="filter-toolbar">
+    <form class="search-box" method="get">
+      <i class="bi bi-search"></i>
+      <input type="hidden" name="tab" value="payments">
+      <?php if ($paymentStatusFilter !== 'all'): ?><input type="hidden" name="status" value="<?= clean($paymentStatusFilter) ?>"><?php endif; ?>
+      <input type="search" name="q" value="<?= clean($search) ?>" placeholder="Search tenant, room…" class="form-control form-control-sm">
+    </form>
+    <div class="filter-pills">
+      <?php $paymentPills = ['all' => 'All', 'Paid' => 'Paid', 'Pending' => 'Pending', 'Overdue' => 'Overdue'];
+      foreach ($paymentPills as $key => $label):
+          $count = $key === 'all' ? $paymentTotalCount : $paymentStatusCounts[$key];
+          $qs = http_build_query(array_filter(['tab' => 'payments', 'status' => $key === 'all' ? null : $key, 'q' => $search ?: null]));
+      ?>
+        <a href="?<?= $qs ?>" class="filter-pill <?= $paymentStatusFilter === $key ? 'active' : '' ?>"><?= clean($label) ?> <span class="pill-count"><?= $count ?></span></a>
+      <?php endforeach; ?>
     </div>
+    <span class="filter-result-count"><?= $paymentsResult['total'] ?> record<?= $paymentsResult['total'] === 1 ? '' : 's' ?></span>
   </div>
+  <div class="table-responsive">
+    <table class="table app-table align-middle">
+      <thead><tr><th>Tenant</th><th>Month</th><th>Amount</th><th>Method</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
+      <tbody>
+      <?php if (!$payments): ?><tr><td colspan="6" class="text-center text-muted py-4">No payments found.</td></tr><?php endif; ?>
+      <?php foreach ($payments as $p): ?>
+        <tr>
+          <td><?= clean($p['first_name'] . ' ' . $p['last_name']) ?><div class="text-muted small"><?= $p['room_number'] ? 'Room ' . clean($p['room_number']) : '' ?></div></td>
+          <td class="small"><?= clean($p['payment_for_month'] ?: '—') ?></td>
+          <td><?= peso($p['payment_amount']) ?></td>
+          <td class="small">
+            <?php if ($p['payment_method'] === 'GCash' && $p['paymongo_checkout_id']): ?>
+              <span class="badge badge-info"><i class="bi bi-phone"></i> GCash</span>
+            <?php else: ?>
+              <?= clean($p['payment_method'] ?: '—') ?>
+            <?php endif; ?>
+          </td>
+          <td><span class="badge badge-<?= status_badge_class($p['payment_status']) ?>"><?= clean($p['payment_status']) ?></span></td>
+          <td class="text-end">
+            <?php if ($p['payment_status'] !== 'Paid'): ?>
+              <form method="post" class="d-inline"><?= csrf_field() ?><input type="hidden" name="action" value="verify_payment"><input type="hidden" name="payment_id" value="<?= $p['payment_id'] ?>"><input type="hidden" name="new_status" value="Paid"><button class="btn btn-sm btn-maroon">Mark Paid</button></form>
+            <?php else: ?>
+              <span class="text-muted small"><?= clean(date('n/j/Y', strtotime($p['payment_date']))) ?></span>
+            <?php endif; ?>
+          </td>
+        </tr>
+      <?php endforeach; ?>
+      </tbody>
+    </table>
+  </div>
+  <?= pagination_links($paymentsResult['page'], $paymentsResult['totalPages']) ?>
+</div>
 
-  <div class="col-lg-5">
-    <div class="panel" id="contracts">
-      <div class="panel-header"><h2>Contracts</h2><button type="button" class="btn btn-sm btn-maroon" data-bs-toggle="modal" data-bs-target="#contractModal"><i class="bi bi-upload"></i> Upload</button></div>
-<<<<<<< HEAD
-      <div class="contract-list">
-        <?php if (!$contracts): ?><p class="text-muted py-3">No contracts yet.</p><?php endif; ?>
-        <?php foreach ($contracts as $c):
-          $daysLeft = days_until($c['contract_end']);
-          $isExpiring = $c['contract_status'] === 'Active' && $daysLeft <= 30;
-        ?>
-          <div class="contract-item">
-            <div>
-              <strong><?= clean($c['first_name'] . ' ' . $c['last_name']) ?></strong>
-              <div class="text-muted small">Room <?= clean($c['room_number']) ?> · <?= clean(date('M j, Y', strtotime($c['contract_start']))) ?> – <?= clean(date('M j, Y', strtotime($c['contract_end']))) ?></div>
-              <?php if ($isExpiring): ?><div class="text-danger small"><i class="bi bi-exclamation-triangle-fill"></i> Expires in <?= $daysLeft ?> day<?= $daysLeft === 1 ? '' : 's' ?></div><?php endif; ?>
-            </div>
-            <div class="text-end">
-              <span class="badge badge-<?= status_badge_class($isExpiring ? 'Expiring Soon' : $c['contract_status']) ?>"><?= $isExpiring ? 'Expiring Soon' : clean($c['contract_status']) ?></span>
-              <?php if ($c['contract_file']): ?><div><a href="<?= BASE_URL . '/' . clean($c['contract_file']) ?>" target="_blank" class="small"><i class="bi bi-file-earmark-text"></i> File</a></div><?php endif; ?>
-            </div>
-=======
-      <?php if ((int) ($contractCounts['expired'] ?? 0) || (int) ($contractCounts['expiring'] ?? 0) || (int) ($contractCounts['requested'] ?? 0)): ?>
-        <div class="contract-summary">
-          <?php if ((int) $contractCounts['expired']): ?><span class="badge badge-danger"><?= (int) $contractCounts['expired'] ?> expired</span><?php endif; ?>
-          <?php if ((int) $contractCounts['expiring']): ?><span class="badge badge-warning"><?= (int) $contractCounts['expiring'] ?> expiring soon</span><?php endif; ?>
-          <?php if ((int) $contractCounts['requested']): ?><span class="badge badge-info"><?= (int) $contractCounts['requested'] ?> renewal request<?= (int) $contractCounts['requested'] === 1 ? '' : 's' ?></span><?php endif; ?>
-        </div>
-      <?php endif; ?>
-      <div class="contract-list">
-        <?php if (!$contracts): ?><p class="text-muted py-3">No contracts yet.</p><?php endif; ?>
-        <?php foreach ($contracts as $c):
+<?php elseif ($activeTab === 'contracts'): ?>
+<div class="panel mt-2" id="contracts">
+  <div class="panel-header"><h2>Contracts</h2></div>
+  <form class="search-box mb-3" method="get">
+    <i class="bi bi-search"></i>
+    <input type="hidden" name="tab" value="contracts">
+    <input type="search" name="q" value="<?= clean($search) ?>" placeholder="Search tenant or room…" class="form-control form-control-sm">
+  </form>
+  <?php if ((int) ($contractCounts['expired'] ?? 0) || (int) ($contractCounts['expiring'] ?? 0) || (int) ($contractCounts['requested'] ?? 0)): ?>
+    <div class="contract-summary">
+      <?php if ((int) $contractCounts['expired']): ?><span class="badge badge-danger"><?= (int) $contractCounts['expired'] ?> expired</span><?php endif; ?>
+      <?php if ((int) $contractCounts['expiring']): ?><span class="badge badge-warning"><?= (int) $contractCounts['expiring'] ?> expiring soon</span><?php endif; ?>
+      <?php if ((int) $contractCounts['requested']): ?><span class="badge badge-info"><?= (int) $contractCounts['requested'] ?> renewal request<?= (int) $contractCounts['requested'] === 1 ? '' : 's' ?></span><?php endif; ?>
+    </div>
+  <?php endif; ?>
+  <div class="contracts-grid">
+    <?php if (!$contracts): ?><p class="text-muted py-3">No contracts found.</p><?php endif; ?>
+    <?php foreach ($contracts as $c):
           $daysLeft   = days_until($c['contract_end']);
           $isExpired  = $c['contract_status'] === 'Expired';
           $isExpiring = $c['contract_status'] === 'Expiring Soon' || ($c['contract_status'] === 'Active' && $daysLeft <= 30);
@@ -396,31 +429,31 @@ include __DIR__ . '/../includes/header.php';
           $renewFrom  = max($c['contract_end'], date('Y-m-d'));
           $suggestedEnd = date('Y-m-d', strtotime($renewFrom . ' +1 year'));
         ?>
-          <div class="contract-item<?= $isExpired ? ' is-expired' : ($isExpiring ? ' is-expiring' : '') ?>">
-            <div>
-              <strong><?= clean($c['first_name'] . ' ' . $c['last_name']) ?></strong>
-              <div class="text-muted small">Room <?= clean($c['room_number']) ?> · <?= clean(date('M j, Y', strtotime($c['contract_start']))) ?> – <?= clean(date('M j, Y', strtotime($c['contract_end']))) ?></div>
-              <?php if ($isExpired): ?>
-                <div class="text-danger small"><i class="bi bi-exclamation-octagon-fill"></i> Expired <?= abs($daysLeft) ?> day<?= abs($daysLeft) === 1 ? '' : 's' ?> ago — renew or terminate</div>
-              <?php elseif ($isExpiring && !$isClosed): ?>
-                <div class="text-danger small"><i class="bi bi-exclamation-triangle-fill"></i> Expires in <?= $daysLeft ?> day<?= $daysLeft === 1 ? '' : 's' ?></div>
-              <?php endif; ?>
-              <?php if ($requested && !$isClosed): ?>
-                <div class="small" style="color:var(--blue-text);"><i class="bi bi-hand-index-thumb-fill"></i> Tenant requested a renewal on <?= clean(date('M j, Y', strtotime($c['renewal_requested_at']))) ?></div>
-              <?php endif; ?>
-              <?php if ((int) ($c['renewal_count'] ?? 0) > 0): ?>
-                <div class="text-muted small">Renewed <?= (int) $c['renewal_count'] ?> time<?= (int) $c['renewal_count'] === 1 ? '' : 's' ?><?= $c['last_renewed_at'] ? ', last on ' . clean(date('M j, Y', strtotime($c['last_renewed_at']))) : '' ?></div>
-              <?php endif; ?>
-              <?php if ($isClosed && !empty($c['termination_reason'])): ?>
-                <div class="text-muted small">Ended: <?= clean($c['termination_reason']) ?></div>
-              <?php endif; ?>
+          <div class="contract-card<?= $isExpired ? ' is-expired' : ($isExpiring ? ' is-expiring' : '') ?>">
+            <div class="contract-card-top">
+              <span class="contract-card-icon"><i class="bi bi-file-earmark-text-fill"></i></span>
+              <?php if ($c['contract_file']): ?><a href="<?= BASE_URL . '/' . clean($c['contract_file']) ?>" target="_blank" class="contract-card-download" title="Download"><i class="bi bi-download"></i></a><?php endif; ?>
             </div>
-            <div class="text-end">
-              <span class="badge badge-<?= status_badge_class($c['contract_status']) ?>"><?= clean($c['contract_status']) ?></span>
-              <?php if ($c['contract_file']): ?><div><a href="<?= BASE_URL . '/' . clean($c['contract_file']) ?>" target="_blank" class="small"><i class="bi bi-file-earmark-text"></i> File</a></div><?php endif; ?>
+            <strong><?= clean($c['first_name'] . ' ' . $c['last_name']) ?></strong>
+            <div class="text-muted small">Room <?= clean($c['room_number']) ?></div>
+            <div class="contract-card-meta"><i class="bi bi-calendar-range"></i> <?= clean(date('M Y', strtotime($c['contract_start']))) ?> – <?= clean(date('M Y', strtotime($c['contract_end']))) ?></div>
+            <div class="contract-card-meta"><i class="bi bi-clock-history"></i> Uploaded <?= clean(date('M j, Y', strtotime($c['created_at']))) ?></div>
+            <?php if ($requested && !$isClosed): ?>
+              <div class="small mt-1" style="color:var(--blue-text);"><i class="bi bi-hand-index-thumb-fill"></i> Renewal requested <?= clean(date('M j, Y', strtotime($c['renewal_requested_at']))) ?></div>
+            <?php endif; ?>
+            <?php if ((int) ($c['renewal_count'] ?? 0) > 0): ?>
+              <div class="text-muted small">Renewed <?= (int) $c['renewal_count'] ?> time<?= (int) $c['renewal_count'] === 1 ? '' : 's' ?></div>
+            <?php endif; ?>
+            <?php if ($isClosed && !empty($c['termination_reason'])): ?>
+              <div class="text-muted small">Ended: <?= clean($c['termination_reason']) ?></div>
+            <?php endif; ?>
+            <div class="mt-2">
+              <span class="badge badge-<?= status_badge_class($c['contract_status']) ?>">
+                <?= $isExpired ? 'Expired ' . abs($daysLeft) . 'd ago' : ($isExpiring ? 'Expires in ' . $daysLeft . 'd' : clean($c['contract_status'])) ?>
+              </span>
             </div>
             <?php if (!$isClosed): ?>
-              <div class="contract-actions">
+              <div class="contract-card-actions">
                 <button type="button" class="btn btn-sm <?= $isExpired || $isExpiring ? 'btn-maroon' : 'btn-outline-maroon' ?>"
                   data-bs-toggle="modal" data-bs-target="#renewContractModal"
                   data-id="<?= $c['contract_id'] ?>"
@@ -438,13 +471,38 @@ include __DIR__ . '/../includes/header.php';
                   data-room="<?= clean($c['room_number']) ?>"><i class="bi bi-x-octagon"></i> Terminate Contract</button>
               </div>
             <?php endif; ?>
->>>>>>> origin/james
           </div>
         <?php endforeach; ?>
-      </div>
-    </div>
   </div>
 </div>
+
+<?php else: /* expirations */ ?>
+<div class="panel mt-2" id="expirations">
+  <div class="panel-header"><h2>Expirations</h2></div>
+  <?php
+    $expiringSoonList = array_filter($contracts, function ($c) {
+        return $c['contract_status'] !== 'Terminated' && days_until($c['contract_end']) <= 60;
+    });
+  ?>
+  <?php if ($expiringSoonList): ?>
+    <div class="callout callout-warning">
+      <i class="bi bi-exclamation-triangle-fill"></i>
+      <div><?= count($expiringSoonList) ?> contract<?= count($expiringSoonList) === 1 ? '' : 's' ?> expiring within 60 days.</div>
+    </div>
+  <?php else: ?>
+    <p class="text-muted mb-0">No contracts expiring within the next 60 days.</p>
+  <?php endif; ?>
+  <?php foreach ($expiringSoonList as $c): $d = days_until($c['contract_end']); ?>
+    <div class="contract-item<?= $d < 0 ? ' is-expired' : ' is-expiring' ?>">
+      <div>
+        <strong><?= clean($c['first_name'] . ' ' . $c['last_name']) ?></strong>
+        <div class="text-muted small">Room <?= clean($c['room_number']) ?> · <?= clean(date('M j, Y', strtotime($c['contract_start']))) ?> – <?= clean(date('M j, Y', strtotime($c['contract_end']))) ?></div>
+      </div>
+      <div class="text-end"><span class="badge badge-<?= $d < 0 ? 'danger' : 'warning' ?>"><?= $d < 0 ? 'Expired ' . abs($d) . 'd ago' : 'Expires in ' . $d . 'd' ?></span></div>
+    </div>
+  <?php endforeach; ?>
+</div>
+<?php endif; ?>
 
 <!-- New Contract Modal -->
 <div class="modal fade" id="contractModal" tabindex="-1">
@@ -490,8 +548,6 @@ include __DIR__ . '/../includes/header.php';
   </div>
 </div>
 
-<<<<<<< HEAD
-=======
 <!-- Renew Contract Modal -->
 <div class="modal fade" id="renewContractModal" tabindex="-1">
   <div class="modal-dialog">
@@ -555,7 +611,6 @@ include __DIR__ . '/../includes/header.php';
   </div>
 </div>
 
->>>>>>> origin/james
 <!-- Record Payment Modal -->
 <div class="modal fade" id="paymentModal" tabindex="-1">
   <div class="modal-dialog">
@@ -572,19 +627,12 @@ include __DIR__ . '/../includes/header.php';
             <select class="form-select mb-3" name="contract_id" id="payment_contract_select" required>
               <option value="">Choose…</option>
               <?php foreach ($activeContracts as $c): ?>
-<<<<<<< HEAD
-                <option value="<?= $c['contract_id'] ?>" data-tenant="<?= $c['tenant_id'] ?>" data-rent="<?= $c['monthly_rent'] ?>"><?= clean($c['first_name'] . ' ' . $c['last_name']) ?> — Room <?= clean($c['room_number']) ?></option>
-=======
                 <option value="<?= $c['contract_id'] ?>" data-tenant="<?= $c['tenant_id'] ?>" data-rent="<?= $c['monthly_rent'] ?>"><?= clean($c['first_name'] . ' ' . $c['last_name']) ?> — Room <?= clean($c['room_number']) ?><?= $c['contract_status'] === 'Expired' ? ' (expired contract)' : '' ?></option>
->>>>>>> origin/james
               <?php endforeach; ?>
             </select>
             <input type="hidden" name="tenant_id" id="payment_tenant_id">
             <div class="row g-3">
               <div class="col-md-6"><label class="form-label">Amount (₱)</label><input type="number" step="0.01" min="0" class="form-control" name="payment_amount" id="payment_amount" required></div>
-<<<<<<< HEAD
-              <div class="col-md-6"><label class="form-label">For Month</label><input type="text" class="form-control" name="payment_for_month" placeholder="e.g. June 2026" required></div>
-=======
               <div class="col-md-6">
                 <label class="form-label">For Month</label>
                 <select class="form-select" name="payment_for_month" required>
@@ -593,7 +641,6 @@ include __DIR__ . '/../includes/header.php';
                   <?php endforeach; ?>
                 </select>
               </div>
->>>>>>> origin/james
             </div>
             <div class="mb-1 mt-3">
               <label class="form-label">Method</label>
@@ -619,8 +666,6 @@ document.getElementById('payment_contract_select')?.addEventListener('change', f
   document.getElementById('payment_tenant_id').value = this.selectedOptions[0]?.dataset.tenant || '';
   document.getElementById('payment_amount').value = this.selectedOptions[0]?.dataset.rent || '';
 });
-<<<<<<< HEAD
-=======
 
 // ---- Renew / Terminate modals -----------------------------------------
 // The renewal date always counts forward from whichever is later: the
@@ -662,7 +707,6 @@ document.getElementById('terminateContractModal')?.addEventListener('show.bs.mod
   document.getElementById('tc_name').textContent = btn.dataset.name;
   document.getElementById('tc_room').textContent = btn.dataset.room;
 });
->>>>>>> origin/james
 </script>";
 include __DIR__ . '/../includes/footer.php';
 ?>

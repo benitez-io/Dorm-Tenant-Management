@@ -25,20 +25,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // Email whoever matches the target
         $recipients = [];
         if ($target === 'all') {
-            $recipients = $db->query("SELECT u.email, u.first_name FROM users u JOIN tenants t ON t.user_id=u.user_id WHERE t.status='Active'")->fetchAll();
+            $recipients = $db->query("SELECT u.email, u.first_name, u.phone FROM users u JOIN tenants t ON t.user_id=u.user_id WHERE t.status='Active'")->fetchAll();
         } elseif ($target === 'room') {
             $rooms = array_map('trim', explode(',', $value));
             $in = implode(',', array_fill(0, count($rooms), '?'));
-            $stmt = $db->prepare("SELECT u.email, u.first_name FROM users u JOIN tenants t ON t.user_id=u.user_id JOIN dorm_rooms r ON r.room_id=t.room_id WHERE r.room_number IN ($in)");
+            $stmt = $db->prepare("SELECT u.email, u.first_name, u.phone FROM users u JOIN tenants t ON t.user_id=u.user_id JOIN dorm_rooms r ON r.room_id=t.room_id WHERE r.room_number IN ($in)");
             $stmt->execute($rooms);
             $recipients = $stmt->fetchAll();
         } elseif ($target === 'tenant') {
-            $stmt = $db->prepare("SELECT u.email, u.first_name FROM users u JOIN tenants t ON t.user_id=u.user_id WHERE t.tenant_id = ?");
+            $stmt = $db->prepare("SELECT u.email, u.first_name, u.phone FROM users u JOIN tenants t ON t.user_id=u.user_id WHERE t.tenant_id = ?");
             $stmt->execute([(int) $value]);
             $recipients = $stmt->fetchAll();
         }
         foreach ($recipients as $r) {
             send_email_alert($r['email'], $r['first_name'], $subject, email_template($subject, $message));
+          if ($type !== 'Announcement' && !empty($r['phone'])) {
+            error_log('[SMS notification queued] To: ' . $r['phone'] . ' | Subject: ' . $subject . ' | Message: ' . $message);
+          }
         }
 
         flash('success', 'Notification sent to ' . count($recipients) . ' tenant(s).');
@@ -48,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $recent = $db->query("SELECT * FROM notifications ORDER BY date_sent DESC LIMIT 15")->fetchAll();
-$tenantsForSelect = $db->query("SELECT t.tenant_id, u.first_name, u.last_name FROM tenants t JOIN users u ON u.user_id=t.user_id WHERE t.status='Active' ORDER BY u.first_name")->fetchAll();
+$tenantsForSelect = $db->query("SELECT t.tenant_id, u.first_name, u.last_name, u.phone FROM tenants t JOIN users u ON u.user_id=t.user_id WHERE t.status='Active' ORDER BY u.first_name")->fetchAll();
 
 $typeIcon = ['Announcement' => '<i class="bi bi-megaphone-fill"></i>', 'Payment Reminder' => '<i class="bi bi-credit-card-fill"></i>', 'Contract Expiry Alert' => '⏰'];
 $typeTint = ['Announcement' => '', 'Payment Reminder' => 'tint-amber', 'Contract Expiry Alert' => 'tint-blue'];
@@ -60,8 +63,14 @@ $typeOptions = [
 
 $pageTitle = 'Notification Management';
 include __DIR__ . '/../includes/header.php';
+require_once __DIR__ . '/../includes/module_tabs.php';
 ?>
 <div class="page-header"><div><h1>Notification Management</h1><p class="text-muted">Send announcements, payment reminders, and expiry alerts to tenants.</p></div></div>
+<?php render_module_tabs([
+  ['key' => 'announcements', 'label' => 'Announcements', 'href' => '/admin/notifications.php#notification-announcements', 'target' => 'notification-announcements', 'selectValue' => 'Announcement'],
+  ['key' => 'payments', 'label' => 'Payment Reminders', 'href' => '/admin/notifications.php#notification-payments', 'target' => 'notification-payments', 'selectValue' => 'Payment Reminder'],
+  ['key' => 'expiry', 'label' => 'Expiry Alerts', 'href' => '/admin/notifications.php#notification-expiry', 'target' => 'notification-expiry', 'selectValue' => 'Contract Expiry Alert'],
+], 'announcements'); ?>
 
 <div class="row g-4" id="compose">
   <div class="col-lg-4">
@@ -69,7 +78,7 @@ include __DIR__ . '/../includes/header.php';
       <div class="panel-header"><h2>Notification Type</h2></div>
       <div class="type-option-list">
         <?php foreach ($typeOptions as $value => [$icon, $label, $desc]): ?>
-          <label class="type-option <?= $value === 'Announcement' ? 'selected' : '' ?>" data-value="<?= clean($value) ?>">
+          <label id="notification-<?= $value === 'Announcement' ? 'announcements' : ($value === 'Payment Reminder' ? 'payments' : 'expiry') ?>" class="type-option anchor-target <?= $value === 'Announcement' ? 'selected' : '' ?>" data-value="<?= clean($value) ?>">
             <input type="radio" name="type_display" value="<?= clean($value) ?>" <?= $value === 'Announcement' ? 'checked' : '' ?>>
             <span class="type-icon"><?= $icon ?></span>
             <span><strong><?= clean($label) ?></strong><p><?= clean($desc) ?></p></span>
@@ -101,7 +110,7 @@ include __DIR__ . '/../includes/header.php';
           <label class="form-label">Tenant</label>
           <select class="form-select" name="target_value_tenant" id="targetValueTenant">
             <option value="">Choose…</option>
-            <?php foreach ($tenantsForSelect as $t): ?><option value="<?= $t['tenant_id'] ?>"><?= clean($t['first_name'] . ' ' . $t['last_name']) ?></option><?php endforeach; ?>
+            <?php foreach ($tenantsForSelect as $t): ?><option value="<?= $t['tenant_id'] ?>"><?= clean($t['first_name'] . ' ' . $t['last_name']) ?><?= $t['phone'] ? ' (' . clean($t['phone']) . ')' : '' ?></option><?php endforeach; ?>
           </select>
         </div>
         <div class="mb-3"><label class="form-label">Subject</label><input type="text" class="form-control" id="subjectInput" name="subject" placeholder="Enter announcement subject" required></div>

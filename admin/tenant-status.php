@@ -19,22 +19,28 @@ $result = paginate(
      JOIN users u ON u.user_id = t.user_id
      LEFT JOIN dorm_rooms r ON r.room_id = t.room_id
      WHERE t.approval_status = 'Approved'
-<<<<<<< HEAD
        AND t.tenant_id NOT IN (SELECT tenant_id FROM dismissed_records WHERE page = 'status')
      ORDER BY FIELD(t.status,'Active','Pending','Evicted','Checked Out'), u.first_name",
     "SELECT COUNT(*) c FROM tenants t WHERE t.approval_status = 'Approved'
        AND t.tenant_id NOT IN (SELECT tenant_id FROM dismissed_records WHERE page = 'status')"
-=======
-     ORDER BY FIELD(t.status,'Active','Pending','Evicted','Checked Out'), u.first_name",
-    "SELECT COUNT(*) c FROM tenants t WHERE t.approval_status = 'Approved'"
->>>>>>> origin/james
 );
 $allTenants = $result['rows'];
 
 $pageTitle = 'Track Tenant Status';
 include __DIR__ . '/../includes/header.php';
-?>
-<div class="page-header"><div><h1>Track Tenant Status</h1><p class="text-muted">Monitor tenant status and activity across all properties.</p></div></div>
+require_once __DIR__ . '/../includes/module_tabs.php';
+require_once __DIR__ . '/../includes/page_header.php';
+render_page_header(
+    'bi-people-fill',
+    'Tenant Management',
+    'Review applications, track tenant status, and manage check-in/check-out.',
+    '<a href="' . BASE_URL . '/admin/users.php" class="btn btn-maroon"><i class="bi bi-plus-lg"></i> New Application</a>'
+);
+render_module_tabs([
+  ['key' => 'registration', 'label' => 'Registration & Approval', 'href' => '/admin/tenants.php'],
+  ['key' => 'status', 'label' => 'Track Status', 'href' => '/admin/tenant-status.php'],
+  ['key' => 'checkin', 'label' => 'Check-in / Check-out', 'href' => '/admin/checkinout.php'],
+], 'status'); ?>
 
 <div class="stat-grid stat-grid-4">
   <div class="stat-card"><div class="stat-card-body"><div class="stat-label">Active</div><div class="stat-value text-success"><?= $counts['Active'] ?></div></div><div class="stat-icon stat-icon-outline"><i class="bi bi-check-lg"></i></div></div>
@@ -44,7 +50,6 @@ include __DIR__ . '/../includes/header.php';
 </div>
 
 <div class="panel mt-2">
-<<<<<<< HEAD
   <div class="panel-header">
     <h2>All Tenants</h2>
     <?php if ($allTenants): ?>
@@ -61,8 +66,6 @@ include __DIR__ . '/../includes/header.php';
     </div>
     <?php endif; ?>
   </div>
-=======
->>>>>>> origin/james
   <div class="table-responsive">
     <table class="table app-table align-middle">
       <thead><tr><th>Tenant</th><th>Room</th><th>Status</th><th>Contract Period</th><th>Details</th><th class="text-end">Actions</th></tr></thead>

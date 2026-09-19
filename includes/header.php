@@ -19,15 +19,6 @@
       <button class="btn-menu-toggle" id="menuToggle" type="button" aria-label="Open menu"><i class="bi bi-list"></i></button>
       <span class="mobile-title"><?= current_role() === 'admin' ? 'Admin Portal' : 'Tenant Portal' ?></span>
     </div>
-    <?php if (current_role() === 'admin'): ?>
-      <div class="view-toggle d-none d-lg-flex justify-content-end mb-3">
-        <a class="pill-active" href="<?= BASE_URL ?>/admin/dashboard.php">Admin Dashboard</a>
-      </div>
-    <?php elseif (current_role() === 'tenant'): ?>
-      <div class="view-toggle d-none d-lg-flex justify-content-end mb-3">
-        <a class="pill-active" href="<?= BASE_URL ?>/tenant/dashboard.php">Tenant App</a>
-      </div>
-    <?php endif; ?>
     <?php if ($msg = flash('success')): ?>
       <div class="alert alert-success alert-dismissible fade show" role="alert">
         <?= clean($msg) ?><button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>

@@ -64,4 +64,42 @@ document.addEventListener('DOMContentLoaded', function () {
       }
     });
   });
+
+  document.querySelectorAll('.module-tabs [data-scroll-target]').forEach(function (tab) {
+    tab.addEventListener('click', function (event) {
+      const target = document.getElementById(tab.dataset.scrollTarget);
+      if (!target) return;
+
+      event.preventDefault();
+      const currentTab = document.querySelector('.module-tabs .module-tab.active');
+      if (currentTab) currentTab.classList.remove('active');
+      tab.classList.add('active');
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+      const previousTarget = document.querySelector('.anchor-target.anchor-highlight');
+      if (previousTarget) {
+        previousTarget.classList.remove('anchor-highlight');
+        const previousState = previousTarget.querySelector('.selection-state');
+        if (previousState) previousState.hidden = true;
+      }
+      target.classList.add('anchor-highlight');
+      const state = target.querySelector('.selection-state');
+      if (state) state.hidden = false;
+      if (tab.dataset.selectValue) {
+        const option = target.querySelector('input[value="' + tab.dataset.selectValue + '"]');
+        if (option) option.closest('.type-option').click();
+      }
+      window.history.replaceState(null, '', tab.getAttribute('href'));
+    });
+  });
+
+  const initialHash = window.location.hash.slice(1);
+  if (initialHash) {
+    const initialTab = document.querySelector('.module-tabs [data-scroll-target="' + initialHash + '"]');
+    if (initialTab) {
+      const currentTab = document.querySelector('.module-tabs .module-tab.active');
+      if (currentTab) currentTab.classList.remove('active');
+      initialTab.classList.add('active');
+    }
+  }
 });

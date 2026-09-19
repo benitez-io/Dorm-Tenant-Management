@@ -30,6 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $newId = (int) $db->lastInsertId();
                     $db->prepare('INSERT INTO tenants (user_id, status, approval_status) VALUES (?, "Pending", "Approved")')
                        ->execute([$newId]);
+                    log_activity($db, 'tenant_registered', $first . ' ' . $last . ' was registered by an admin', (int) $db->lastInsertId());
                 }
                 flash('success', 'Account created for ' . $first . ' ' . $last . '.');
             }
@@ -46,13 +47,14 @@ $roleInfo = [
 
 $pageTitle = 'Register Account';
 include __DIR__ . '/../includes/header.php';
-?>
-<div class="page-header">
-  <div>
-    <h1>Register Account</h1>
-    <p class="text-muted">Create new user accounts for the system.</p>
-  </div>
-</div>
+require_once __DIR__ . '/../includes/module_tabs.php';
+require_once __DIR__ . '/../includes/page_header.php';
+render_page_header('bi-person-fill', 'User Management', 'Register accounts, manage login credentials, and assign roles.');
+render_module_tabs([
+  ['key' => 'register', 'label' => 'Register Account', 'href' => '/admin/users.php'],
+  ['key' => 'credentials', 'label' => 'Login Credentials', 'href' => '/admin/credentials.php'],
+  ['key' => 'manage', 'label' => 'Manage Tenants', 'href' => '/admin/manage-tenants.php'],
+], 'register'); ?>
 
 <div class="panel">
   <form method="post" class="needs-validation split-form" novalidate>

@@ -4,6 +4,7 @@ require_role('admin');
 
 $db = get_db();
 $teams = ['Electrician Team', 'Plumber Team', 'HVAC Team', 'Maintenance Crew A', 'Maintenance Crew B'];
+$issueTypes = ['Plumbing', 'Electrical', 'HVAC / Air Conditioning', 'Heating', 'Furniture', 'Security / Locks', 'Pest Control', 'Other'];
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
@@ -16,98 +17,220 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             flash('error', 'Please choose a valid team.');
         } else {
             $db->prepare("UPDATE maintenance_requests SET status='Ongoing', assigned_to=? WHERE maintenance_id=?")->execute([$team, $id]);
+            $mTenant = $db->prepare('SELECT tenant_id FROM maintenance_requests WHERE maintenance_id=?');
+            $mTenant->execute([$id]);
+            log_activity($db, 'maintenance_updated', "Request #$id assigned to $team", $mTenant->fetch()['tenant_id'] ?? null);
             flash('success', "Task assigned to $team.");
         }
     }
 
     if ($action === 'complete') {
         $db->prepare("UPDATE maintenance_requests SET status='Completed', date_resolved=CURDATE() WHERE maintenance_id=?")->execute([$id]);
+        $mTenant = $db->prepare('SELECT tenant_id FROM maintenance_requests WHERE maintenance_id=?');
+        $mTenant->execute([$id]);
+        log_activity($db, 'maintenance_updated', "Request #$id marked completed", $mTenant->fetch()['tenant_id'] ?? null);
         flash('success', 'Marked as completed.');
+    }
+
+    if ($action === 'log_request') {
+        $tenantId = (int) ($_POST['tenant_id'] ?? 0);
+        $title    = str_input($_POST, 'issue_type');
+        $desc     = str_input($_POST, 'description');
+        $priority = in_array($_POST['priority_level'] ?? '', ['Low', 'Medium', 'High', 'Urgent'], true) ? $_POST['priority_level'] : 'Medium';
+
+        $t = $db->prepare('SELECT room_id FROM tenants WHERE tenant_id = ? AND room_id IS NOT NULL');
+        $t->execute([$tenantId]);
+        $t = $t->fetch();
+
+        if (!$t) {
+            flash('error', 'Please choose a tenant with an assigned room.');
+        } elseif ($title === '' || $desc === '') {
+            flash('error', 'Please choose an issue type and describe the problem.');
+        } else {
+            $db->prepare('INSERT INTO maintenance_requests (tenant_id, room_id, issue_title, issue_description, priority_level) VALUES (?,?,?,?,?)')
+               ->execute([$tenantId, $t['room_id'], $title, $desc, $priority]);
+            log_activity($db, 'maintenance_submitted', $title . ' request logged by admin', $tenantId);
+            flash('success', 'Maintenance request logged.');
+        }
     }
 
     redirect('/admin/maintenance.php');
 }
 
-function fetch_maintenance(PDO $db, string $status): array
-{
-    $stmt = $db->prepare("
-        SELECT m.*, u.first_name, u.last_name, r.room_number
-        FROM maintenance_requests m
-        JOIN tenants t ON t.tenant_id = m.tenant_id
-        JOIN users u ON u.user_id = t.user_id
-        JOIN dorm_rooms r ON r.room_id = m.room_id
-        WHERE m.status = ?
-        ORDER BY FIELD(m.priority_level,'Urgent','High','Medium','Low'), m.date_submitted ASC
-    ");
-    $stmt->execute([$status]);
-    return $stmt->fetchAll();
+$search = str_input($_GET, 'q');
+$statusFilter = $_GET['status'] ?? 'all';
+if (!in_array($statusFilter, ['all', 'Pending', 'Ongoing', 'Completed'], true)) {
+    $statusFilter = 'all';
 }
 
-$pendingTasks   = fetch_maintenance($db, 'Pending');
-$ongoingTasks   = fetch_maintenance($db, 'Ongoing');
-$completedTasks = fetch_maintenance($db, 'Completed');
+$where = [];
+$params = [];
+if ($statusFilter !== 'all') {
+    $where[] = 'm.status = ?';
+    $params[] = $statusFilter;
+}
+if ($search !== '') {
+    $where[] = '(m.issue_title LIKE ? OR r.room_number LIKE ? OR u.first_name LIKE ? OR u.last_name LIKE ?)';
+    $like = "%$search%";
+    array_push($params, $like, $like, $like, $like);
+}
+$whereSql = $where ? 'WHERE ' . implode(' AND ', $where) : '';
+
+$statusCounts = ['Pending' => 0, 'Ongoing' => 0, 'Completed' => 0];
+foreach ($db->query("SELECT status, COUNT(*) c FROM maintenance_requests GROUP BY status") as $row) {
+    $statusCounts[$row['status']] = (int) $row['c'];
+}
+$totalCount = array_sum($statusCounts);
+
+$result = paginate(
+    $db,
+    "SELECT m.*, u.first_name, u.last_name, r.room_number
+     FROM maintenance_requests m
+     JOIN tenants t ON t.tenant_id = m.tenant_id
+     JOIN users u ON u.user_id = t.user_id
+     JOIN dorm_rooms r ON r.room_id = m.room_id
+     $whereSql
+     ORDER BY FIELD(m.status,'Pending','Ongoing','Completed'), FIELD(m.priority_level,'Urgent','High','Medium','Low'), m.date_submitted ASC",
+    "SELECT COUNT(*) c FROM maintenance_requests m
+     JOIN tenants t ON t.tenant_id = m.tenant_id
+     JOIN users u ON u.user_id = t.user_id
+     JOIN dorm_rooms r ON r.room_id = m.room_id
+     $whereSql",
+    $params,
+    10
+);
+$requests = $result['rows'];
+
+// Active tenants with a room assigned — the only ones a request can be logged for.
+$roomedTenants = $db->query("
+    SELECT t.tenant_id, u.first_name, u.last_name, r.room_number
+    FROM tenants t
+    JOIN users u ON u.user_id = t.user_id
+    JOIN dorm_rooms r ON r.room_id = t.room_id
+    WHERE t.status = 'Active'
+    ORDER BY u.first_name
+")->fetchAll();
 
 $pageTitle = 'Maintenance Management';
 include __DIR__ . '/../includes/header.php';
+require_once __DIR__ . '/../includes/module_tabs.php';
+require_once __DIR__ . '/../includes/page_header.php';
+render_page_header(
+    'bi-tools',
+    'Maintenance Management',
+    'Log requests, assign tasks to teams, and track resolution progress.',
+    '<button type="button" class="btn btn-maroon" data-bs-toggle="modal" data-bs-target="#logRequestModal"><i class="bi bi-plus-lg"></i> Log New Request</button>'
+);
+$tabKey = $statusFilter === 'Pending' ? 'assign' : ($statusFilter === 'Ongoing' ? 'status' : 'requests');
+render_module_tabs([
+  ['key' => 'requests', 'label' => 'View Requests', 'href' => '/admin/maintenance.php'],
+  ['key' => 'assign', 'label' => 'Assign Tasks', 'href' => '/admin/maintenance.php?status=Pending'],
+  ['key' => 'status', 'label' => 'Track Status', 'href' => '/admin/maintenance.php?status=Ongoing'],
+], $tabKey);
 
-function render_task_card(array $m, array $teams): void
-{
-    $priorityClass = ['Urgent' => 'danger', 'High' => 'danger', 'Medium' => 'warning', 'Low' => 'secondary'][$m['priority_level']] ?? 'secondary';
-    ?>
-    <div class="task-card">
-      <div class="task-card-top">
-        <strong><?= clean($m['issue_title']) ?></strong>
-        <span class="badge badge-<?= $priorityClass ?>"><?= clean($m['priority_level']) ?></span>
-      </div>
-      <p class="text-muted small mb-2"><?= clean($m['issue_description']) ?></p>
-      <div class="text-muted small"><i class="bi bi-geo-alt-fill"></i> Room <?= clean($m['room_number']) ?> · <i class="bi bi-person-fill"></i> <?= clean($m['first_name'] . ' ' . $m['last_name']) ?></div>
-      <div class="text-muted small"><i class="bi bi-calendar-event"></i> <?= clean(date('n/j/Y', strtotime($m['date_submitted']))) ?></div>
-      <?php if ($m['assigned_to']): ?><div class="small mt-1"><i class="bi bi-tools"></i> <?= clean($m['assigned_to']) ?></div><?php endif; ?>
-      <div><span class="task-tag"><?= clean($m['issue_title']) ?></span></div>
-
-      <?php if ($m['status'] === 'Pending'): ?>
-        <form method="post" class="mt-2 d-flex gap-1">
-          <?= csrf_field() ?>
-          <input type="hidden" name="action" value="assign">
-          <input type="hidden" name="maintenance_id" value="<?= $m['maintenance_id'] ?>">
-          <select name="team" class="form-select form-select-sm" required>
-            <option value="">Assign to…</option>
-            <?php foreach ($teams as $team): ?><option><?= clean($team) ?></option><?php endforeach; ?>
-          </select>
-          <button class="btn btn-sm btn-maroon">Go</button>
-        </form>
-      <?php elseif ($m['status'] === 'Ongoing'): ?>
-        <form method="post" class="mt-2"><?= csrf_field() ?><input type="hidden" name="action" value="complete"><input type="hidden" name="maintenance_id" value="<?= $m['maintenance_id'] ?>"><button class="btn btn-sm btn-outline-maroon w-100">Mark Completed</button></form>
-      <?php elseif ($m['date_resolved']): ?>
-        <div class="text-success small mt-1"><i class="bi bi-check-lg"></i> Resolved <?= clean(date('n/j/Y', strtotime($m['date_resolved']))) ?></div>
-      <?php endif; ?>
-    </div>
-    <?php
-}
+$statusPills = ['all' => 'All', 'Pending' => 'Pending', 'Ongoing' => 'Ongoing', 'Completed' => 'Completed'];
+$priorityBadge = ['Urgent' => 'danger', 'High' => 'warning', 'Medium' => 'info', 'Low' => 'secondary'];
 ?>
-<div class="page-header"><div><h1>Maintenance Management</h1><p class="text-muted">Manage and assign maintenance tasks across all properties.</p></div></div>
-
 <div class="stat-grid stat-grid-3">
-  <div class="stat-card"><div class="stat-card-body"><div class="stat-label">Pending</div><div class="stat-value"><?= count($pendingTasks) ?></div></div><div class="stat-icon stat-icon-outline"><i class="bi bi-clock-fill"></i></div></div>
-  <div class="stat-card"><div class="stat-card-body"><div class="stat-label">Ongoing</div><div class="stat-value"><?= count($ongoingTasks) ?></div></div><div class="stat-icon stat-icon-outline"><i class="bi bi-tools"></i></div></div>
-  <div class="stat-card"><div class="stat-card-body"><div class="stat-label">Completed</div><div class="stat-value"><?= count($completedTasks) ?></div></div><div class="stat-icon stat-icon-outline"><i class="bi bi-check-lg"></i></div></div>
+  <div class="stat-card"><div class="stat-card-body"><div class="stat-label">Pending</div><div class="stat-value"><?= $statusCounts['Pending'] ?></div></div><div class="stat-icon stat-icon-outline"><i class="bi bi-clock-fill"></i></div></div>
+  <div class="stat-card"><div class="stat-card-body"><div class="stat-label">Ongoing</div><div class="stat-value"><?= $statusCounts['Ongoing'] ?></div></div><div class="stat-icon stat-icon-outline"><i class="bi bi-tools"></i></div></div>
+  <div class="stat-card"><div class="stat-card-body"><div class="stat-label">Completed</div><div class="stat-value"><?= $statusCounts['Completed'] ?></div></div><div class="stat-icon stat-icon-outline"><i class="bi bi-check-lg"></i></div></div>
 </div>
 
-<div class="kanban mt-2" id="kanban">
-  <div class="kanban-col">
-    <div class="kanban-col-header">⏱ Pending (<?= count($pendingTasks) ?>)</div>
-    <?php if (!$pendingTasks): ?><p class="text-muted small">Nothing pending.</p><?php endif; ?>
-    <?php foreach ($pendingTasks as $m) render_task_card($m, $teams); ?>
+<div class="panel mt-2 anchor-target" id="maintenance-requests">
+  <div class="filter-toolbar">
+    <form class="search-box" method="get">
+      <i class="bi bi-search"></i>
+      <?php if ($statusFilter !== 'all'): ?><input type="hidden" name="status" value="<?= clean($statusFilter) ?>"><?php endif; ?>
+      <input type="search" name="q" value="<?= clean($search) ?>" placeholder="Search title, room, tenant…" class="form-control form-control-sm">
+    </form>
+    <div class="filter-pills">
+      <?php foreach ($statusPills as $key => $label):
+          $count = $key === 'all' ? $totalCount : $statusCounts[$key];
+          $qs = http_build_query(array_filter(['status' => $key === 'all' ? null : $key, 'q' => $search ?: null]));
+      ?>
+        <a href="?<?= $qs ?>" class="filter-pill <?= $statusFilter === $key ? 'active' : '' ?>"><?= clean($label) ?> <span class="pill-count"><?= $count ?></span></a>
+      <?php endforeach; ?>
+    </div>
+    <span class="filter-result-count"><?= $result['total'] ?> result<?= $result['total'] === 1 ? '' : 's' ?></span>
   </div>
-  <div class="kanban-col col-ongoing">
-    <div class="kanban-col-header"><i class="bi bi-tools"></i> Ongoing (<?= count($ongoingTasks) ?>)</div>
-    <?php if (!$ongoingTasks): ?><p class="text-muted small">Nothing in progress.</p><?php endif; ?>
-    <?php foreach ($ongoingTasks as $m) render_task_card($m, $teams); ?>
+
+  <?php if (!$requests): ?>
+    <p class="text-muted text-center py-4">No maintenance requests found.</p>
+  <?php else: ?>
+  <div class="table-responsive">
+    <table class="table app-table align-middle">
+      <thead><tr><th>Request</th><th>Room / Tenant</th><th>Category</th><th>Priority</th><th>Status</th><th>Assigned To</th><th>Reported</th><th class="text-end">Actions</th></tr></thead>
+      <tbody>
+      <?php foreach ($requests as $m): ?>
+        <tr>
+          <td><strong><?= clean($m['issue_title']) ?></strong><div class="text-muted small"><?= clean(mb_strimwidth($m['issue_description'], 0, 60, '…')) ?></div></td>
+          <td class="small">Room <?= clean($m['room_number']) ?><div class="text-muted"><?= clean($m['first_name'] . ' ' . $m['last_name']) ?></div></td>
+          <td class="small"><?= clean(maintenance_category_bucket($m['issue_title'])) ?></td>
+          <td><span class="badge badge-<?= $priorityBadge[$m['priority_level']] ?? 'secondary' ?>"><?= clean($m['priority_level']) ?></span></td>
+          <td><span class="badge badge-<?= status_badge_class($m['status']) ?>">● <?= clean($m['status']) ?></span></td>
+          <td class="small"><?= clean($m['assigned_to'] ?: '—') ?></td>
+          <td class="small text-muted"><?= clean(date('n/j/Y', strtotime($m['date_submitted']))) ?></td>
+          <td class="text-end">
+            <?php if ($m['status'] === 'Pending'): ?>
+              <form method="post" class="d-inline-flex gap-1 align-items-center">
+                <?= csrf_field() ?>
+                <input type="hidden" name="action" value="assign">
+                <input type="hidden" name="maintenance_id" value="<?= $m['maintenance_id'] ?>">
+                <select name="team" class="form-select form-select-sm" required style="width:auto;">
+                  <option value="">Assign…</option>
+                  <?php foreach ($teams as $team): ?><option><?= clean($team) ?></option><?php endforeach; ?>
+                </select>
+                <button class="btn btn-sm btn-maroon">Go</button>
+              </form>
+            <?php elseif ($m['status'] === 'Ongoing'): ?>
+              <form method="post" class="d-inline"><?= csrf_field() ?><input type="hidden" name="action" value="complete"><input type="hidden" name="maintenance_id" value="<?= $m['maintenance_id'] ?>"><button class="btn btn-sm btn-outline-maroon">Mark Completed</button></form>
+            <?php else: ?>
+              <span class="text-muted small"><?= $m['date_resolved'] ? clean(date('n/j/Y', strtotime($m['date_resolved']))) : '—' ?></span>
+            <?php endif; ?>
+          </td>
+        </tr>
+      <?php endforeach; ?>
+      </tbody>
+    </table>
   </div>
-  <div class="kanban-col">
-    <div class="kanban-col-header"><i class="bi bi-check-circle-fill"></i> Completed (<?= count($completedTasks) ?>)</div>
-    <?php if (!$completedTasks): ?><p class="text-muted small">No completed tasks yet.</p><?php endif; ?>
-    <?php foreach (array_slice($completedTasks, 0, 10) as $m) render_task_card($m, $teams); ?>
+  <?= pagination_links($result['page'], $result['totalPages']) ?>
+  <?php endif; ?>
+</div>
+
+<!-- Log New Request Modal -->
+<div class="modal fade" id="logRequestModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <form method="post">
+        <?= csrf_field() ?>
+        <input type="hidden" name="action" value="log_request">
+        <div class="modal-header"><h5 class="modal-title">Log New Maintenance Request</h5><button class="btn-close" data-bs-dismiss="modal"></button></div>
+        <div class="modal-body">
+          <?php if (!$roomedTenants): ?>
+            <p class="text-muted">No active tenants with an assigned room yet.</p>
+          <?php else: ?>
+            <label class="form-label">Tenant</label>
+            <select class="form-select mb-3" name="tenant_id" required>
+              <option value="">Choose…</option>
+              <?php foreach ($roomedTenants as $t): ?><option value="<?= $t['tenant_id'] ?>"><?= clean($t['first_name'] . ' ' . $t['last_name']) ?> — Room <?= clean($t['room_number']) ?></option><?php endforeach; ?>
+            </select>
+            <label class="form-label">Issue Type</label>
+            <select class="form-select mb-3" name="issue_type" required>
+              <option value="">Choose…</option>
+              <?php foreach ($issueTypes as $type): ?><option><?= clean($type) ?></option><?php endforeach; ?>
+            </select>
+            <label class="form-label">Priority</label>
+            <select class="form-select mb-3" name="priority_level">
+              <option>Low</option><option selected>Medium</option><option>High</option><option>Urgent</option>
+            </select>
+            <label class="form-label">Description</label>
+            <textarea class="form-control" name="description" rows="3" required placeholder="Describe the issue…"></textarea>
+          <?php endif; ?>
+        </div>
+        <div class="modal-footer"><button class="btn btn-light" data-bs-dismiss="modal" type="button">Cancel</button><?php if ($roomedTenants): ?><button class="btn btn-maroon">Log Request</button><?php endif; ?></div>
+      </form>
+    </div>
   </div>
 </div>
 <?php include __DIR__ . '/../includes/footer.php'; ?>

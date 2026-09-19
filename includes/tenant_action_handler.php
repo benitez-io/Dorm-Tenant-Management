@@ -18,7 +18,6 @@ if (!defined('BASE_URL')) { http_response_code(403); exit('Direct access not per
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
     $action   = $_POST['action'] ?? '';
-<<<<<<< HEAD
 
     /**
      * "Clear" on Registration/Approval, Track Status, and Check-in/
@@ -69,8 +68,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect($selfPath);
     }
 
-=======
->>>>>>> origin/james
     $tenantId = (int) ($_POST['tenant_id'] ?? 0);
 
     $tenantStmt = $db->prepare("SELECT t.*, u.first_name, u.last_name, u.email FROM tenants t JOIN users u ON u.user_id = t.user_id WHERE t.tenant_id = ?");
@@ -84,6 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'approve') {
         $db->prepare("UPDATE tenants SET approval_status = 'Approved', rejection_reason = NULL WHERE tenant_id = ?")->execute([$tenantId]);
+        log_activity($db, 'tenant_approved', $tenant['first_name'] . ' ' . $tenant['last_name'] . '\'s application was approved', $tenantId);
         flash('success', $tenant['first_name'] . ' has been approved. Assign them a room in Property Management next.');
         send_email_alert($tenant['email'], $tenant['first_name'], 'Your application has been approved',
             email_template('You\'re approved!', "Hi {$tenant['first_name']}, your tenant application has been approved. We'll notify you again once a room is assigned."));
@@ -93,6 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $reason = str_input($_POST, 'reason');
         $db->prepare("UPDATE tenants SET approval_status = 'Rejected', rejection_reason = ? WHERE tenant_id = ?")
            ->execute([$reason ?: null, $tenantId]);
+        log_activity($db, 'tenant_rejected', $tenant['first_name'] . ' ' . $tenant['last_name'] . '\'s application was rejected', $tenantId);
         flash('success', 'Application rejected.');
         $body = "Hi {$tenant['first_name']}, your tenant application was not approved."
               . ($reason !== '' ? " Reason given: {$reason}" : '')
@@ -128,6 +127,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 WHERE tenant_id = ? AND contract_status IN ('Active','Expiring Soon')
             ")->execute([$tenantId]);
             $db->commit();
+            log_activity($db, 'tenant_checked_out', $tenant['first_name'] . ' ' . $tenant['last_name'] . ' checked out', $tenantId);
             flash('success', $tenant['first_name'] . ' checked out. Their room is now available again.');
         } catch (Exception $e) {
             $db->rollBack();
@@ -145,6 +145,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Early/forced end of tenancy — the lease no longer runs its natural course.
             $db->prepare("UPDATE contracts SET contract_status = 'Terminated' WHERE tenant_id = ? AND contract_status IN ('Active','Expiring Soon')")->execute([$tenantId]);
             $db->commit();
+            log_activity($db, 'tenant_evicted', $tenant['first_name'] . ' ' . $tenant['last_name'] . ' was marked as evicted', $tenantId);
             flash('success', $tenant['first_name'] . ' marked as evicted.');
         } catch (Exception $e) {
             $db->rollBack();

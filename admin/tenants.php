@@ -6,109 +6,177 @@ $db = get_db();
 $selfPath = '/admin/tenants.php';
 require __DIR__ . '/../includes/tenant_action_handler.php';
 
-$pending = $db->query("
-    SELECT t.tenant_id, u.first_name, u.last_name, u.email, u.phone, t.date_registered
-    FROM tenants t JOIN users u ON u.user_id = t.user_id
-    WHERE t.approval_status = 'Pending'
-    ORDER BY t.date_registered ASC
-")->fetchAll();
+$search = str_input($_GET, 'q');
+$statusFilter = $_GET['status'] ?? 'all';
+if (!in_array($statusFilter, ['all', 'Pending', 'Approved', 'Rejected'], true)) {
+    $statusFilter = 'all';
+}
 
-$recentlyProcessed = $db->query("
-    SELECT t.tenant_id, u.first_name, u.last_name, r.room_number, t.approval_status, t.rejection_reason
+$where = ["t.tenant_id NOT IN (SELECT tenant_id FROM dismissed_records WHERE page = 'approval')"];
+$params = [];
+if ($statusFilter !== 'all') {
+    $where[] = 't.approval_status = ?';
+    $params[] = $statusFilter;
+}
+if ($search !== '') {
+    $where[] = '(u.first_name LIKE ? OR u.last_name LIKE ? OR r.room_number LIKE ?)';
+    $like = "%$search%";
+    array_push($params, $like, $like, $like);
+}
+$whereSql = 'WHERE ' . implode(' AND ', $where);
+
+// Function to export tenants to CSV
+function exportTenantsToCSV($tenants) {
+  while (ob_get_level()) {
+    ob_end_clean();
+  }
+  header('Content-Type: text/csv; charset=utf-8');
+  header('Content-Disposition: attachment; filename="tenants_' . date('Y-m-d_H-i') . '.csv"');
+    $output = fopen('php://output', 'w');
+  fputs($output, chr(0xEF) . chr(0xBB) . chr(0xBF));
+    fputcsv($output, ['Tenant ID', 'First Name', 'Last Name', 'Room Number', 'Approval Status']);
+    foreach ($tenants as $tenant) {
+        fputcsv($output, [
+            $tenant['tenant_id'],
+            $tenant['first_name'],
+            $tenant['last_name'],
+            $tenant['room_number'] ?? 'No room assigned',
+            $tenant['approval_status']
+        ]);
+    }
+    fclose($output);
+    exit();
+}
+
+// Check if export is requested — exports the currently filtered/searched set
+if (isset($_GET['export']) && $_GET['export'] === 'csv') {
+    $exportStmt = $db->prepare("
+        SELECT t.tenant_id, u.first_name, u.last_name, r.room_number, t.approval_status
+        FROM tenants t
+        JOIN users u ON u.user_id = t.user_id
+        LEFT JOIN dorm_rooms r ON r.room_id = t.room_id
+        $whereSql
+        ORDER BY t.date_registered DESC
+    ");
+    $exportStmt->execute($params);
+    exportTenantsToCSV($exportStmt->fetchAll());
+}
+
+$statusCounts = ['Pending' => 0, 'Approved' => 0, 'Rejected' => 0];
+foreach ($db->query("
+    SELECT t.approval_status, COUNT(*) c
     FROM tenants t
-    JOIN users u ON u.user_id = t.user_id
-    LEFT JOIN dorm_rooms r ON r.room_id = t.room_id
-    WHERE t.approval_status IN ('Approved','Rejected')
-<<<<<<< HEAD
-      AND t.tenant_id NOT IN (SELECT tenant_id FROM dismissed_records WHERE page = 'approval')
-=======
->>>>>>> origin/james
-    ORDER BY t.date_registered DESC
-    LIMIT 5
-")->fetchAll();
+    WHERE t.tenant_id NOT IN (SELECT tenant_id FROM dismissed_records WHERE page = 'approval')
+    GROUP BY t.approval_status
+") as $row) {
+    $statusCounts[$row['approval_status']] = (int) $row['c'];
+}
+$totalCount = array_sum($statusCounts);
+
+$result = paginate(
+    $db,
+    "SELECT t.tenant_id, u.first_name, u.last_name, u.email, u.phone, t.tenant_type, r.room_number, t.approval_status, t.rejection_reason, t.date_registered
+     FROM tenants t
+     JOIN users u ON u.user_id = t.user_id
+     LEFT JOIN dorm_rooms r ON r.room_id = t.room_id
+     $whereSql
+     ORDER BY FIELD(t.approval_status,'Pending','Approved','Rejected'), t.date_registered DESC",
+    "SELECT COUNT(*) c FROM tenants t JOIN users u ON u.user_id = t.user_id LEFT JOIN dorm_rooms r ON r.room_id = t.room_id $whereSql",
+    $params,
+    10
+);
+$applications = $result['rows'];
 
 $pageTitle = 'Tenant Registration/Approval';
 include __DIR__ . '/../includes/header.php';
-?>
-<div class="page-header"><div><h1>Tenant Registration/Approval</h1><p class="text-muted">Review and approve new tenant applications.</p></div></div>
+require_once __DIR__ . '/../includes/module_tabs.php';
+require_once __DIR__ . '/../includes/page_header.php';
+render_page_header(
+    'bi-people-fill',
+    'Tenant Management',
+    'Review applications, track tenant status, and manage check-in/check-out.',
+    '<a href="' . BASE_URL . '/admin/users.php" class="btn btn-maroon"><i class="bi bi-plus-lg"></i> New Application</a>'
+);
+render_module_tabs([
+  ['key' => 'registration', 'label' => 'Registration & Approval', 'href' => '/admin/tenants.php'],
+  ['key' => 'status', 'label' => 'Track Status', 'href' => '/admin/tenant-status.php'],
+  ['key' => 'checkin', 'label' => 'Check-in / Check-out', 'href' => '/admin/checkinout.php'],
+], 'registration');
 
+$statusPills = [
+    'all'      => 'All',
+    'Pending'  => 'Pending',
+    'Approved' => 'Approved',
+    'Rejected' => 'Rejected',
+];
+?>
 <div class="panel">
-  <div class="panel-header"><h2>Pending Applications (<?= count($pending) ?>)</h2></div>
-  <?php if (!$pending): ?>
-    <p class="text-muted py-3">No pending applications.</p>
+  <div class="filter-toolbar">
+    <form class="search-box" method="get">
+      <i class="bi bi-search"></i>
+      <?php if ($statusFilter !== 'all'): ?><input type="hidden" name="status" value="<?= clean($statusFilter) ?>"><?php endif; ?>
+      <input type="search" name="q" value="<?= clean($search) ?>" placeholder="Search applicant, room…" class="form-control form-control-sm">
+    </form>
+    <div class="filter-pills">
+      <?php foreach ($statusPills as $key => $label):
+          $count = $key === 'all' ? $totalCount : $statusCounts[$key];
+          $qs = http_build_query(array_filter(['status' => $key === 'all' ? null : $key, 'q' => $search ?: null]));
+      ?>
+        <a href="?<?= $qs ?>" class="filter-pill <?= $statusFilter === $key ? 'active' : '' ?>"><?= clean($label) ?> <span class="pill-count"><?= $count ?></span></a>
+      <?php endforeach; ?>
+    </div>
+    <span class="filter-result-count"><?= $result['total'] ?> result<?= $result['total'] === 1 ? '' : 's' ?></span>
+  </div>
+
+  <?php if (!$applications): ?>
+    <div class="empty-state-card text-center p-5">
+      <i class="bi bi-person-check fs-1 text-muted"></i>
+      <h5 class="mt-3 fw-bold text-dark">No applications found</h5>
+      <p class="text-muted small">Try a different search or filter.</p>
+    </div>
   <?php else: ?>
   <div class="table-responsive">
     <table class="table app-table align-middle">
-      <thead><tr><th>Applicant</th><th>Contact</th><th>Applied</th><th class="text-end">Actions</th></tr></thead>
+      <thead><tr><th>Applicant</th><th>Contact</th><th>Room</th><th>Applied</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
       <tbody>
-      <?php foreach ($pending as $p): ?>
+      <?php foreach ($applications as $p): ?>
         <tr>
           <td>
             <div class="cell-person">
               <div class="user-avatar-md" style="color:var(--maroon);background:var(--maroon-soft);"><?= clean(strtoupper(substr($p['first_name'], 0, 1))) ?></div>
-              <div><?= clean($p['first_name'] . ' ' . $p['last_name']) ?></div>
+              <div>
+                <?= clean($p['first_name'] . ' ' . $p['last_name']) ?>
+                <div class="sub"><?= clean($p['tenant_type']) ?></div>
+                <?php if ($p['approval_status'] === 'Rejected' && $p['rejection_reason']): ?>
+                  <div class="sub">Reason: <?= clean($p['rejection_reason']) ?></div>
+                <?php endif; ?>
+              </div>
             </div>
           </td>
           <td class="text-muted small"><i class="bi bi-envelope-fill"></i> <?= clean($p['email']) ?><?= $p['phone'] ? '<br><i class="bi bi-telephone-fill"></i> ' . clean($p['phone']) : '' ?></td>
+          <td class="small"><?php if ($p['room_number']): ?><i class="bi bi-geo-alt-fill text-muted"></i> Room <?= clean($p['room_number']) ?><?php else: ?><span class="text-muted">Unassigned</span><?php endif; ?></td>
           <td class="text-muted small"><i class="bi bi-calendar-event"></i> <?= clean(date('n/j/Y', strtotime($p['date_registered']))) ?></td>
+          <td><span class="badge badge-<?= status_badge_class($p['approval_status']) ?>"><?= clean($p['approval_status']) ?></span></td>
           <td class="text-end">
-            <form method="post" class="d-inline"><?= csrf_field() ?><input type="hidden" name="action" value="approve"><input type="hidden" name="tenant_id" value="<?= $p['tenant_id'] ?>"><button class="btn btn-sm btn-maroon">Approve</button></form>
-            <button type="button" class="btn btn-sm btn-outline-danger reject-btn" data-bs-toggle="modal" data-bs-target="#rejectModal"
-              data-id="<?= $p['tenant_id'] ?>" data-name="<?= clean($p['first_name']) ?>">Reject</button>
+            <?php if ($p['approval_status'] === 'Pending'): ?>
+              <form method="post" class="d-inline"><?= csrf_field() ?><input type="hidden" name="action" value="approve"><input type="hidden" name="tenant_id" value="<?= $p['tenant_id'] ?>"><button class="btn btn-sm btn-success"><i class="bi bi-check-lg"></i> Approve</button></form>
+              <button type="button" class="btn btn-sm btn-danger reject-btn" data-bs-toggle="modal" data-bs-target="#rejectModal"
+                data-id="<?= $p['tenant_id'] ?>" data-name="<?= clean($p['first_name']) ?>"><i class="bi bi-x-lg"></i> Reject</button>
+            <?php elseif ($p['approval_status'] === 'Rejected'): ?>
+              <form method="post" class="d-inline"><?= csrf_field() ?><input type="hidden" name="action" value="reconsider"><input type="hidden" name="tenant_id" value="<?= $p['tenant_id'] ?>"><button class="btn btn-sm btn-outline-maroon">Reconsider</button></form>
+            <?php elseif ($p['approval_status'] === 'Approved' && !$p['room_number']): ?>
+              <a href="<?= BASE_URL ?>/admin/rooms.php?tenant=<?= $p['tenant_id'] ?>&tab=assign#rooms" class="btn btn-sm btn-maroon">Assign Room</a>
+            <?php else: ?>
+              <span class="text-muted small">—</span>
+            <?php endif; ?>
           </td>
         </tr>
       <?php endforeach; ?>
       </tbody>
     </table>
   </div>
+  <?= pagination_links($result['page'], $result['totalPages']) ?>
   <?php endif; ?>
-</div>
-
-<div class="panel mt-2">
-<<<<<<< HEAD
-  <div class="panel-header">
-    <h2>Recently Processed</h2>
-    <?php if ($recentlyProcessed): ?>
-    <div class="dropdown">
-      <button class="btn btn-sm btn-outline-maroon dropdown-toggle" type="button" data-bs-toggle="dropdown"><i class="bi bi-eraser-fill"></i> Clear</button>
-      <ul class="dropdown-menu dropdown-menu-end">
-        <li><h6 class="dropdown-header">Clear from this view only</h6></li>
-        <li><form method="post" onsubmit="return confirm('Clear Approved entries from this view? They stay in the database for reports.');"><?= csrf_field() ?><input type="hidden" name="action" value="clear_view"><input type="hidden" name="page" value="approval"><input type="hidden" name="filter" value="Approved"><button class="dropdown-item" type="submit">Clear Approved only</button></form></li>
-        <li><form method="post" onsubmit="return confirm('Clear Rejected entries from this view? They stay in the database for reports.');"><?= csrf_field() ?><input type="hidden" name="action" value="clear_view"><input type="hidden" name="page" value="approval"><input type="hidden" name="filter" value="Rejected"><button class="dropdown-item" type="submit">Clear Rejected only</button></form></li>
-        <li><hr class="dropdown-divider"></li>
-        <li><form method="post" onsubmit="return confirm('Clear ALL recently processed entries from this view? They stay in the database for reports.');"><?= csrf_field() ?><input type="hidden" name="action" value="clear_view"><input type="hidden" name="page" value="approval"><input type="hidden" name="filter" value="all"><button class="dropdown-item" type="submit">Clear all</button></form></li>
-      </ul>
-    </div>
-    <?php endif; ?>
-  </div>
-=======
-  <div class="panel-header"><h2>Recently Processed</h2></div>
->>>>>>> origin/james
-  <?php if (!$recentlyProcessed): ?>
-    <p class="text-muted py-3">Nothing processed yet.</p>
-  <?php endif; ?>
-  <?php foreach ($recentlyProcessed as $r): ?>
-    <div class="list-row align-items-start">
-      <div>
-        <strong><?= clean($r['first_name'] . ' ' . $r['last_name']) ?></strong>
-        <div class="text-muted small"><?= $r['room_number'] ? 'Room ' . clean($r['room_number']) : 'No room assigned' ?></div>
-        <?php if ($r['approval_status'] === 'Rejected' && $r['rejection_reason']): ?>
-          <div class="text-muted small mt-1">Reason: <?= clean($r['rejection_reason']) ?></div>
-        <?php endif; ?>
-      </div>
-      <div class="text-end">
-        <span class="badge badge-<?= $r['approval_status'] === 'Approved' ? 'success' : 'danger' ?>"><?= clean($r['approval_status']) ?></span>
-        <?php if ($r['approval_status'] === 'Rejected'): ?>
-          <form method="post" class="d-inline mt-1 d-block"><?= csrf_field() ?><input type="hidden" name="action" value="reconsider"><input type="hidden" name="tenant_id" value="<?= $r['tenant_id'] ?>"><button class="btn btn-sm btn-outline-maroon">Reconsider</button></form>
-<<<<<<< HEAD
-        <?php elseif ($r['approval_status'] === 'Approved' && !$r['room_number']): ?>
-          <a href="<?= BASE_URL ?>/admin/rooms.php?tenant=<?= $r['tenant_id'] ?>#rooms" class="btn btn-sm btn-maroon mt-1 d-block">Assign Room</a>
-=======
->>>>>>> origin/james
-        <?php endif; ?>
-      </div>
-    </div>
-  <?php endforeach; ?>
 </div>
 
 <!-- Reject Modal -->

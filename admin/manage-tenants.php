@@ -22,12 +22,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $first = str_input($_POST, 'first_name');
         $last  = str_input($_POST, 'last_name');
         $phone = str_input($_POST, 'phone');
+        $type  = in_array($_POST['tenant_type'] ?? '', ['Student', 'Employee'], true) ? $_POST['tenant_type'] : 'Student';
 
         if ($first === '' || $last === '') {
             flash('error', 'Name cannot be blank.');
         } else {
             $db->prepare('UPDATE users SET first_name=?, last_name=?, phone=? WHERE user_id=?')
                ->execute([$first, $last, $phone ?: null, $t['user_id']]);
+            $db->prepare('UPDATE tenants SET tenant_type=? WHERE tenant_id=?')
+               ->execute([$type, $tenantId]);
             flash('success', 'Tenant contact info updated.');
         }
     }
@@ -71,11 +74,18 @@ $tenants = $result['rows'];
 
 $pageTitle = 'Manage Tenants';
 include __DIR__ . '/../includes/header.php';
-?>
-<div class="page-header"><div><h1>Manage Tenants</h1><p class="text-muted">View and manage all tenant information.</p></div></div>
+require_once __DIR__ . '/../includes/module_tabs.php';
+require_once __DIR__ . '/../includes/page_header.php';
+render_page_header('bi-person-fill', 'User Management', 'Register accounts, manage login credentials, and assign roles.');
+render_module_tabs([
+  ['key' => 'register', 'label' => 'Register Account', 'href' => '/admin/users.php'],
+  ['key' => 'credentials', 'label' => 'Login Credentials', 'href' => '/admin/credentials.php'],
+  ['key' => 'manage', 'label' => 'Manage Tenants', 'href' => '/admin/manage-tenants.php'],
+], 'manage'); ?>
 
 <div class="panel">
   <form class="search-box mb-3" method="get" style="max-width:none;">
+    <i class="bi bi-search"></i>
     <input type="search" name="q" value="<?= clean($search) ?>" placeholder="Search by name, room, or email…" class="form-control">
   </form>
   <div class="table-responsive">
@@ -98,7 +108,7 @@ include __DIR__ . '/../includes/header.php';
               <button type="button" class="btn btn-icon" title="Edit" data-bs-toggle="modal" data-bs-target="#editTenantModal"
                 data-id="<?= $t['tenant_id'] ?>" data-first="<?= clean($t['first_name']) ?>" data-last="<?= clean($t['last_name']) ?>"
                 data-phone="<?= clean($t['phone'] ?? '') ?>" data-room="<?= $t['room_number'] ? 'Room ' . clean($t['room_number']) : 'Unassigned' ?>"
-                data-status="<?= clean($t['status']) ?>"><i class="bi bi-pencil-square"></i></button>
+                data-status="<?= clean($t['status']) ?>" data-type="<?= clean($t['tenant_type']) ?>"><i class="bi bi-pencil-square"></i></button>
               <?php if ($t['is_active']): ?>
               <form method="post" class="d-inline" onsubmit="return confirm('Deactivate this tenant\'s account? They will no longer be able to log in. This does not delete their payment or contract history.');">
                 <?= csrf_field() ?>
@@ -129,6 +139,13 @@ include __DIR__ . '/../includes/header.php';
           <div class="mb-3"><label class="form-label">First Name</label><input class="form-control" name="first_name" id="et_first_name" required></div>
           <div class="mb-3"><label class="form-label">Last Name</label><input class="form-control" name="last_name" id="et_last_name" required></div>
           <div class="mb-3"><label class="form-label">Phone</label><input class="form-control" name="phone" id="et_phone"></div>
+          <div class="mb-3">
+            <label class="form-label">Tenant Type</label>
+            <select class="form-select" name="tenant_type" id="et_type">
+              <option value="Student">Student</option>
+              <option value="Employee">Employee</option>
+            </select>
+          </div>
           <div class="mb-3"><label class="form-label">Room</label><input class="form-control" id="et_room" disabled></div>
           <div class="mb-1"><label class="form-label">Status</label><input class="form-control" id="et_status" disabled></div>
           <p class="text-muted small mt-2 mb-0">Room assignment and status changes happen in <a href="<?= BASE_URL ?>/admin/rooms.php">Property Management</a> and <a href="<?= BASE_URL ?>/admin/tenant-status.php">Track Status</a>, to keep room availability in sync.</p>
@@ -149,6 +166,7 @@ document.getElementById('editTenantModal').addEventListener('show.bs.modal', fun
   document.getElementById('et_phone').value = btn.dataset.phone;
   document.getElementById('et_room').value = btn.dataset.room;
   document.getElementById('et_status').value = btn.dataset.status;
+  document.getElementById('et_type').value = btn.dataset.type;
 });
 </script>";
 include __DIR__ . '/../includes/footer.php';

@@ -69,6 +69,7 @@ CREATE TABLE tenants (
   checkout_date     DATE DEFAULT NULL,
   status            ENUM('Pending','Active','Evicted','Checked Out')
                     NOT NULL DEFAULT 'Pending',
+  tenant_type       ENUM('Student','Employee') NOT NULL DEFAULT 'Student',
   key_returned      BOOLEAN NOT NULL DEFAULT FALSE,
   approval_status   ENUM('Pending','Approved','Rejected')
                     NOT NULL DEFAULT 'Pending',
@@ -84,7 +85,6 @@ CREATE TABLE tenants (
   INDEX idx_tenant_room (room_id)
 ) ENGINE=InnoDB;
 
-<<<<<<< HEAD
 -- (page, tenant) pairs an admin cleared from the Registration/Approval,
 -- Track Status, or Check-in/Check-out views. Hides the row from that
 -- one page only — the tenant/payment/contract data underneath is
@@ -98,8 +98,6 @@ CREATE TABLE dismissed_records (
   CONSTRAINT fk_dismissed_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
-=======
->>>>>>> origin/james
 -- ---------------------------------------------------------------------
 -- 4. CONTRACTS — one row per lease term.
 --    Split out from "payments" (see note below) because one contract
@@ -117,8 +115,6 @@ CREATE TABLE contracts (
   contract_status  ENUM('Active','Expiring Soon','Expired','Terminated')
                    NOT NULL DEFAULT 'Active',
   contract_file    VARCHAR(255) DEFAULT NULL, -- uploaded PDF path
-<<<<<<< HEAD
-=======
   -- Renewal / termination trail. A renewal REUSES this row (new
   -- contract_end, same contract_id) so the lease keeps one continuous
   -- payment history instead of splitting across two contracts.
@@ -127,7 +123,6 @@ CREATE TABLE contracts (
   renewal_count        INT UNSIGNED NOT NULL DEFAULT 0,
   terminated_at        DATETIME DEFAULT NULL,
   termination_reason   TEXT DEFAULT NULL,
->>>>>>> origin/james
   created_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_contract_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
   CONSTRAINT fk_contract_room   FOREIGN KEY (room_id)   REFERENCES dorm_rooms(room_id),
@@ -146,13 +141,6 @@ CREATE TABLE payments (
   payment_for_month VARCHAR(20)  DEFAULT NULL,  -- e.g. "June 2026"
   payment_date      DATE DEFAULT NULL,
   due_date          DATE DEFAULT NULL,
-<<<<<<< HEAD
-  payment_status    ENUM('Pending','Paid','Overdue') NOT NULL DEFAULT 'Pending',
-  payment_method    VARCHAR(50) DEFAULT NULL,     -- Cash / GCash / Bank Transfer ...
-  reference_no      VARCHAR(100) DEFAULT NULL,
-  paymongo_checkout_id VARCHAR(100) DEFAULT NULL, -- set when paid online via PayMongo Checkout
-  receipt_file      VARCHAR(255) DEFAULT NULL,
-=======
   payment_status    ENUM('Pending','Paid','Overdue','Failed') NOT NULL DEFAULT 'Pending',
   payment_method    VARCHAR(50) DEFAULT NULL,     -- Cash / GCash / Bank Transfer ...
   reference_no      VARCHAR(100) DEFAULT NULL,
@@ -160,18 +148,13 @@ CREATE TABLE payments (
   paymongo_checkout_id VARCHAR(100) DEFAULT NULL, -- set when payment_method = GCash (PayMongo Checkout Session id)
   paymongo_payment_id  VARCHAR(100) DEFAULT NULL, -- the actual PayMongo Payment id, filled in by the webhook
   webhook_received_at  TIMESTAMP NULL DEFAULT NULL,
->>>>>>> origin/james
   reminder_sent     BOOLEAN NOT NULL DEFAULT FALSE,
   created_at        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_payment_contract FOREIGN KEY (contract_id) REFERENCES contracts(contract_id) ON DELETE CASCADE,
   CONSTRAINT fk_payment_tenant   FOREIGN KEY (tenant_id)   REFERENCES tenants(tenant_id) ON DELETE CASCADE,
   INDEX idx_payment_status (payment_status),
-<<<<<<< HEAD
-  INDEX idx_payment_due (due_date)
-=======
   INDEX idx_payment_due (due_date),
   UNIQUE INDEX idx_payment_paymongo_checkout (paymongo_checkout_id)
->>>>>>> origin/james
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------
@@ -230,6 +213,20 @@ CREATE TABLE reports (
   CONSTRAINT fk_report_user FOREIGN KEY (generated_by) REFERENCES users(user_id)
 ) ENGINE=InnoDB;
 
+-- ---------------------------------------------------------------------
+-- 9. ACTIVITY_LOG — a running feed of notable events, powering the
+--    "Recent Activity" widget on the Admin Dashboard.
+-- ---------------------------------------------------------------------
+CREATE TABLE activity_log (
+  activity_id      INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  activity_type    VARCHAR(40) NOT NULL,   -- e.g. 'tenant_registered', 'payment_recorded'
+  description      VARCHAR(255) NOT NULL,
+  related_tenant_id INT UNSIGNED DEFAULT NULL,
+  created_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_activity_tenant FOREIGN KEY (related_tenant_id) REFERENCES tenants(tenant_id) ON DELETE SET NULL,
+  INDEX idx_activity_created (created_at)
+) ENGINE=InnoDB;
+
 -- =====================================================================
 -- SEED / DEMO DATA
 -- =====================================================================
@@ -269,3 +266,14 @@ VALUES
   (1, 1, 5500.00, 'December 2025', '2025-12-29', '2025-12-30', 'Paid', 'GCash'),
   (1, 1, 5500.00, 'January 2026',  '2026-01-30', '2026-01-30', 'Paid', 'GCash'),
   (1, 1, 5500.00, 'February 2026', '2026-02-28', '2026-02-28', 'Paid', 'Cash');
+
+-- Plain ASCII only: the documented "mysql -u root -p < schema.sql" import
+-- path uses the client's default character set, which on some Windows/
+-- XAMPP setups is cp850 rather than utf8mb4 (unlike the live app's PDO
+-- connection, which always requests utf8mb4) — non-ASCII literals here
+-- would get corrupted on import in that case.
+INSERT INTO activity_log (activity_type, description, related_tenant_id)
+VALUES
+  ('tenant_registered', 'Angel Benitez registered as a new tenant', 1),
+  ('contract_created', 'Contract created for Angel Benitez (Room 102)', 1),
+  ('payment_recorded', 'Payment of PHP 5,500.00 recorded for Angel Benitez (February 2026)', 1);

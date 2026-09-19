@@ -25,6 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $photo = handle_upload('photo', 'maintenance', ['jpg', 'jpeg', 'png']);
                 $db->prepare('INSERT INTO maintenance_requests (tenant_id, room_id, issue_title, issue_description, photo_file) VALUES (?,?,?,?,?)')
                    ->execute([$tenant['tenant_id'], $tenant['room_id'], $title, $desc, $photo]);
+                log_activity($db, 'maintenance_submitted', $title . ' request submitted', $tenant['tenant_id']);
                 flash('success', 'Maintenance request submitted.');
             } catch (RuntimeException $e) {
                 flash('error', $e->getMessage());
