@@ -7,7 +7,21 @@ $selfPath = '/admin/tenants.php';
 require __DIR__ . '/../includes/tenant_action_handler.php';
 
 $search = str_input($_GET, 'q');
-$statusFilter = $_GET['status'] ?? 'all';
+$statusFilter = trim((string) ($_GET['status'] ?? 'all'));
+$normalizedStatus = strtolower($statusFilter);
+if ($normalizedStatus === 'pending' || $normalizedStatus === 'pending ') {
+    $statusFilter = 'Pending';
+} elseif ($normalizedStatus === 'approved') {
+    $statusFilter = 'Approved';
+} elseif ($normalizedStatus === 'declined') {
+    $statusFilter = 'Declined';
+} elseif ($normalizedStatus === 'rejected') {
+    $statusFilter = 'Rejected';
+} elseif ($normalizedStatus === 'all' || $statusFilter === '') {
+    $statusFilter = 'all';
+} else {
+    $statusFilter = 'all';
+}
 if (!in_array($statusFilter, ['all', 'Pending', 'Approved', 'Declined', 'Rejected'], true)) {
     $statusFilter = 'all';
 }

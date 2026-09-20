@@ -39,6 +39,7 @@ $pendingRegistrations = (int) $db->query("SELECT COUNT(*) c FROM tenants WHERE a
 $pending = $db->query("SELECT COUNT(*) c, COALESCE(SUM(payment_amount),0) total FROM payments WHERE payment_status = 'Pending'")->fetch();
 $overdue = $db->query("SELECT COUNT(*) c, COALESCE(SUM(payment_amount),0) total FROM payments WHERE payment_status = 'Overdue'")->fetch();
 $pendingOverdueTenantCount = (int) $db->query("SELECT COUNT(DISTINCT tenant_id) c FROM payments WHERE payment_status IN ('Pending','Overdue')")->fetch()['c'];
+$pendingCount = $pendingRegistrations;
 
 $totalRooms    = (int) $db->query("SELECT COUNT(*) c FROM dorm_rooms")->fetch()['c'];
 $occupiedRooms = (int) $db->query("SELECT COUNT(*) c FROM dorm_rooms WHERE status = 'Occupied'")->fetch()['c'];
@@ -85,7 +86,7 @@ $roomTypeBreakdown = $db->query("
     FROM dorm_rooms GROUP BY room_type ORDER BY room_type
 ")->fetchAll();
 
-$recentActivity = $db->query("SELECT * FROM activity_log ORDER BY created_at DESC LIMIT 6")->fetchAll();
+$recentActivity = $db->query("SELECT activity_id, activity_type, description, related_tenant_id, created_at FROM activity_log ORDER BY created_at DESC LIMIT 6")->fetchAll();
 
 // =====================================================================
 // TENANTS TAB DATA
@@ -100,6 +101,7 @@ $pendingRegRows = $db->query("
     WHERE t.approval_status = 'Pending'
     ORDER BY t.date_registered DESC LIMIT 5
 ")->fetchAll();
+$pendingCount = count($pendingRegRows);
 
 $recentActiveTenants = $db->query("
     SELECT t.tenant_id, u.first_name, u.last_name, t.tenant_type, r.room_number,
@@ -209,43 +211,51 @@ $activityIcons = [
 </div>
 
 <div class="stat-grid dashboard-kpis">
-  <div class="stat-card">
-    <div class="stat-card-body">
-      <div class="stat-label">Monthly Revenue</div>
-      <div class="stat-value"><?= peso($billedThisMonth) ?></div>
-      <div class="stat-sub">Total billed · <?= date('F Y') ?></div>
+  <div class="stat-card h-100">
+    <div class="stat-card-body d-flex flex-column justify-content-between h-100">
+      <div>
+        <div class="stat-label">Monthly Revenue</div>
+        <div class="stat-value"><?= peso($billedThisMonth) ?></div>
+        <div class="stat-sub">Total billed · <?= date('F Y') ?></div>
+      </div>
       <?php if ($billedGrowth !== null): ?>
-        <span class="badge badge-<?= $billedGrowth >= 0 ? 'success' : 'danger' ?> mt-2 d-inline-block"><i class="bi bi-arrow-<?= $billedGrowth >= 0 ? 'up' : 'down' ?>"></i> <?= abs($billedGrowth) ?>% vs last month</span>
+        <span class="badge badge-<?= $billedGrowth >= 0 ? 'success' : 'danger' ?> mt-3 d-inline-block"><i class="bi bi-arrow-<?= $billedGrowth >= 0 ? 'up' : 'down' ?>"></i> <?= abs($billedGrowth) ?>% vs last month</span>
       <?php endif; ?>
     </div>
     <div class="stat-icon stat-icon-green"><i class="bi bi-graph-up-arrow"></i></div>
   </div>
-  <div class="stat-card">
-    <div class="stat-card-body">
-      <div class="stat-label">Overdue Payments</div>
-      <div class="stat-value"><?= $overdueTenantCount ?> Tenant<?= $overdueTenantCount === 1 ? '' : 's' ?></div>
-      <div class="stat-sub">Past due · immediate action needed</div>
-      <?php if ($overdueTenantCount > 0): ?><span class="badge badge-danger mt-2 d-inline-block">Action Required</span><?php endif; ?>
+  <div class="stat-card h-100">
+    <div class="stat-card-body d-flex flex-column justify-content-between h-100">
+      <div>
+        <div class="stat-label">Overdue Payments</div>
+        <div class="stat-value"><?= $overdueTenantCount ?> Tenant<?= $overdueTenantCount === 1 ? '' : 's' ?></div>
+        <div class="stat-sub text-xs text-slate-500">Past due · immediate action needed</div>
+      </div>
+      <?php if ($overdueTenantCount > 0): ?><span class="badge badge-danger mt-3 d-inline-block">Action Required</span><?php endif; ?>
     </div>
     <div class="stat-icon stat-icon-red"><i class="bi bi-exclamation-triangle-fill"></i></div>
   </div>
-  <div class="stat-card">
-    <div class="stat-card-body">
-      <div class="stat-label">Urgent Maintenance</div>
-      <div class="stat-value"><?= $openMaintenance ?> Open</div>
-      <div class="stat-sub"><?= $urgentMaintenance ?> urgent · <?= $ongoingCount ?> in progress</div>
-      <?php if ($urgentMaintenance > 0): ?><span class="badge badge-warning mt-2 d-inline-block"><?= $urgentMaintenance ?> Urgent</span><?php endif; ?>
+  <div class="stat-card h-100">
+    <div class="stat-card-body d-flex flex-column justify-content-between h-100">
+      <div>
+        <div class="stat-label">Urgent Maintenance</div>
+        <div class="stat-value"><?= $openMaintenance ?> Open</div>
+        <div class="stat-sub"><?= $urgentMaintenance ?> urgent · <?= $ongoingCount ?> in progress</div>
+      </div>
+      <?php if ($urgentMaintenance > 0): ?><span class="badge badge-warning mt-3 d-inline-block"><?= $urgentMaintenance ?> Urgent</span><?php endif; ?>
     </div>
     <div class="stat-icon stat-icon-amber"><i class="bi bi-tools"></i></div>
   </div>
-  <div class="stat-card">
-    <div class="stat-card-body">
-      <div class="stat-label">Pending Registrations</div>
-      <div class="stat-value"><?= $pendingRegistrations ?> App<?= $pendingRegistrations === 1 ? '' : 's' ?></div>
-      <div class="stat-sub">Awaiting admin approval</div>
-      <?php if ($pendingRegistrations > 0): ?><span class="badge badge-info mt-2 d-inline-block">Needs Review</span><?php endif; ?>
+  <div class="stat-card pending-reg-card h-100 pb-3">
+    <div class="stat-card-body d-flex flex-column justify-content-between h-100">
+      <div>
+        <div class="stat-label">Pending Registrations</div>
+        <div class="stat-value"><?= $pendingRegistrations ?> Pending</div>
+        <div class="stat-sub">Awaiting admin approval</div>
+      </div>
+      <?php if ($pendingRegistrations > 0): ?><span class="badge pending-review-badge mt-2 d-inline-flex align-items-center justify-content-center">Needs Review</span><?php endif; ?>
     </div>
-    <div class="stat-icon stat-icon-blue"><i class="bi bi-person-lines-fill"></i></div>
+    <div class="stat-icon pending-reg-icon"><i class="bi bi-person-lines-fill"></i></div>
   </div>
 </div>
 
@@ -256,7 +266,6 @@ $activityIcons = [
     <a id="pill-payments" class="dashboard-tab tab-pill <?= $activeTab === 'payments' ? 'active' : '' ?>" href="?tab=payments" data-dashboard-tab="payments"><i class="bi bi-credit-card-fill"></i> Payments <span class="tab-count"><?= $pendingOverdueTenantCount ?></span></a>
     <a id="pill-maintenance" class="dashboard-tab tab-pill <?= $activeTab === 'maintenance' ? 'active' : '' ?>" href="?tab=maintenance" data-dashboard-tab="maintenance"><i class="bi bi-wrench-adjustable-circle-fill"></i> Maintenance <span class="tab-count"><?= $openMaintenance ?></span></a>
   </div>
-  <span class="dashboard-summary-hint"><i class="bi bi-gear-fill"></i> Summary view · use sidebar for full management tools</span>
 </nav>
 
 <div id="tab-overview" class="tab-content-panel dashboard-view dashboard-overview-view" style="<?= $activeTab === 'overview' ? '' : 'display:none;' ?>">
@@ -295,15 +304,16 @@ $activityIcons = [
         </div>
       </div>
       <div class="panel mt-3">
-        <div class="panel-header"><h2>Recent Activity</h2><a href="<?= BASE_URL ?>/admin/reports.php" class="small">View all →</a></div>
+        <div class="panel-header"><h2>Recent Activity</h2><a href="<?= BASE_URL ?>/admin/reports.php" class="group inline-nav-link dashboard-card-footer-link">View all <i class="bi bi-arrow-up-right link-arrow-icon"></i></a></div>
         <?php if (!$recentActivity): ?><p class="text-muted mb-0">Activity will appear here as the system is used.</p><?php endif; ?>
         <div class="activity-feed">
           <?php foreach ($recentActivity as $a): ?>
+            <?php $rawTimestamp = $a['created_at'] ?? null; ?>
             <div class="activity-item">
               <div class="activity-icon"><i class="bi <?= $activityIcons[$a['activity_type']] ?? 'bi-info-circle-fill' ?>"></i></div>
               <div class="flex-grow-1">
                 <div><?= clean($a['description']) ?></div>
-                <div class="text-muted small js-relative-time" data-relative-time="<?= clean(date('c', strtotime($a['created_at']))) ?>"><?= clean(time_ago($a['created_at'])) ?></div>
+                <div class="text-muted small js-relative-time" data-relative-time="<?= clean(!empty($rawTimestamp) ? date('c', strtotime((string) $rawTimestamp)) : '') ?>"><?= clean(time_ago($rawTimestamp)) ?></div>
               </div>
             </div>
           <?php endforeach; ?>
@@ -316,7 +326,10 @@ $activityIcons = [
 <section id="tab-tenants" class="tab-content-panel dashboard-view" style="<?= $activeTab === 'tenants' ? '' : 'display:none;' ?>">
   <div class="stat-grid stat-grid-4">
     <div class="stat-card"><div class="stat-card-body"><div class="stat-label">Active Tenants</div><div class="stat-value"><?= $activeTenantsCount ?></div><div class="stat-sub">of <?= $totalApprovedTenants ?> total</div></div><div class="stat-icon stat-icon-green"><i class="bi bi-people-fill"></i></div></div>
-    <div class="stat-card"><div class="stat-card-body"><div class="stat-label">Pending Approval</div><div class="stat-value"><?= $pendingRegistrations ?></div><div class="stat-sub">Awaiting registration review</div></div><div class="stat-icon stat-icon-amber"><i class="bi bi-hourglass-split"></i></div></div>
+    <div class="stat-card stat-card-link" role="link" tabindex="0" aria-label="Review pending registrations" onclick="window.location='<?= BASE_URL ?>/admin/tenants.php?tab=registration&status=Pending';" onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); window.location='<?= BASE_URL ?>/admin/tenants.php?tab=registration&status=Pending'; }" style="cursor:pointer;">
+      <div class="stat-card-body"><div class="stat-label">Pending Approval</div><div class="stat-value"><?= $pendingRegistrations ?></div><div class="stat-sub">Awaiting registration review</div></div>
+      <div class="stat-icon stat-icon-amber"><i class="bi bi-hourglass-split"></i></div>
+    </div>
     <div class="stat-card"><div class="stat-card-body"><div class="stat-label">Overdue Rent</div><div class="stat-value"><?= $overdueTenantCount ?></div><div class="stat-sub">Past due this billing period</div></div><div class="stat-icon stat-icon-red"><i class="bi bi-cash-stack"></i></div></div>
     <div class="stat-card"><div class="stat-card-body"><div class="stat-label">Expiring Contracts</div><div class="stat-value"><?= $expiringContracts ?></div><div class="stat-sub">Due within 30 days</div></div><div class="stat-icon stat-icon-amber"><i class="bi bi-file-earmark-text"></i></div></div>
   </div>
@@ -324,28 +337,35 @@ $activityIcons = [
   <div class="row g-4 mt-1">
     <div class="col-lg-8">
       <div class="panel">
-        <div class="panel-header"><h2>Pending Registrations <span class="text-muted small fw-normal">(<?= $pendingRegistrations ?> awaiting review)</span></h2></div>
+        <div class="panel-header">
+          <h2>Pending Registrations <span class="text-muted small fw-normal">(<?= $pendingRegistrations ?> awaiting review)</span></h2>
+          <a href="<?= BASE_URL ?>/admin/tenants.php?tab=registration&status=Pending" class="group inline-nav-link dashboard-card-footer-link fw-semibold">Review All <i class="bi bi-arrow-up-right link-arrow-icon"></i></a>
+        </div>
         <?php if (!$pendingRegRows): ?><p class="text-muted mb-0">No pending applications.</p><?php endif; ?>
         <?php foreach ($pendingRegRows as $p): ?>
-          <div class="pending-reg-card">
+          <a href="<?= BASE_URL ?>/admin/tenants.php?tab=registration&status=Pending" class="pending-reg-card pending-reg-card-link" aria-label="Review pending applicant <?= clean($p['first_name'] . ' ' . $p['last_name']) ?>">
             <div><strong><?= clean($p['first_name'] . ' ' . $p['last_name']) ?></strong><div class="text-muted small">Applied <?= clean(date('M j, Y', strtotime($p['date_registered']))) ?></div></div>
             <span class="badge badge-warning">● Pending</span>
-          </div>
+          </a>
         <?php endforeach; ?>
       </div>
-      <div class="panel mt-3">
+      <div class="panel mt-3 panel-spaced-footer">
         <div class="panel-header"><h2>Recent Active Tenants</h2></div>
-        <?php if (!$recentActiveTenants): ?><p class="text-muted mb-0">No active tenants yet.</p><?php endif; ?>
-        <?php foreach ($recentActiveTenants as $t): ?>
-          <div class="tenant-row">
-            <div class="cell-person">
-              <div class="user-avatar-md" style="color:var(--maroon);background:var(--maroon-soft);"><?= clean(strtoupper(substr($t['first_name'], 0, 1))) ?></div>
-              <div><?= clean($t['first_name'] . ' ' . $t['last_name']) ?><div class="sub"><?= $t['room_number'] ? 'Room ' . clean($t['room_number']) : 'Unassigned' ?> · <?= clean($t['tenant_type']) ?></div></div>
+        <?php if (!$recentActiveTenants): ?><p class="text-muted mb-0 panel-empty-state">No active tenants yet.</p><?php endif; ?>
+        <div class="panel-list">
+          <?php foreach ($recentActiveTenants as $t): ?>
+            <div class="tenant-row panel-list-item">
+              <div class="cell-person">
+                <div class="user-avatar-md" style="color:var(--maroon);background:var(--maroon-soft);"><?= clean(strtoupper(substr($t['first_name'], 0, 1))) ?></div>
+                <div><?= clean($t['first_name'] . ' ' . $t['last_name']) ?><div class="sub"><?= $t['room_number'] ? 'Room ' . clean($t['room_number']) : 'Unassigned' ?> · <?= clean($t['tenant_type']) ?></div></div>
+              </div>
+              <span class="badge badge-<?= status_badge_class($t['last_payment_status']) ?>">● <?= clean($t['last_payment_status']) ?></span>
             </div>
-            <span class="badge badge-<?= status_badge_class($t['last_payment_status']) ?>">● <?= clean($t['last_payment_status']) ?></span>
-          </div>
-        <?php endforeach; ?>
-        <a href="<?= BASE_URL ?>/admin/manage-tenants.php" class="footer-link">→ Open Full Tenant Directory</a>
+          <?php endforeach; ?>
+        </div>
+        <div class="panel-footer-row">
+          <a href="<?= BASE_URL ?>/admin/manage-tenants.php" class="group footer-link dashboard-card-footer-link"><i class="bi bi-arrow-up-right link-arrow-icon"></i> Open Full Tenant Directory</a>
+        </div>
       </div>
     </div>
     <div class="col-lg-4">
@@ -387,19 +407,23 @@ $activityIcons = [
         </div>
         <div class="donut-legend mt-2"><span><span class="dot" style="background:#2fa15c"></span>Collected</span><span><span class="dot" style="background:#e6a917"></span>Pending</span><span><span class="dot" style="background:#d3555a"></span>Overdue</span></div>
       </div>
-      <div class="panel mt-3">
+      <div class="panel mt-3 panel-spaced-footer">
         <div class="panel-header"><h2>Recent Payments</h2></div>
-        <?php if (!$recentPayments): ?><p class="text-muted mb-0">No payments recorded yet.</p><?php endif; ?>
-        <?php foreach ($recentPayments as $p): ?>
-          <div class="tenant-row">
-            <div class="cell-person">
-              <div class="user-avatar-md" style="color:var(--maroon);background:var(--maroon-soft);"><?= clean(strtoupper(substr($p['first_name'], 0, 1))) ?></div>
-              <div><?= clean($p['first_name'] . ' ' . $p['last_name']) ?><div class="sub"><?= $p['room_number'] ? 'Room ' . clean($p['room_number']) : '—' ?> · <?= clean($p['payment_method'] ?: '—') ?> · <?= $p['payment_date'] ? clean(date('M j, Y', strtotime($p['payment_date']))) : '—' ?></div></div>
+        <?php if (!$recentPayments): ?><p class="text-muted mb-0 panel-empty-state">No payments recorded yet.</p><?php endif; ?>
+        <div class="panel-list">
+          <?php foreach ($recentPayments as $p): ?>
+            <div class="tenant-row panel-list-item">
+              <div class="cell-person">
+                <div class="user-avatar-md" style="color:var(--maroon);background:var(--maroon-soft);"><?= clean(strtoupper(substr($p['first_name'], 0, 1))) ?></div>
+                <div><?= clean($p['first_name'] . ' ' . $p['last_name']) ?><div class="sub"><?= $p['room_number'] ? 'Room ' . clean($p['room_number']) : '—' ?> · <?= clean($p['payment_method'] ?: '—') ?> · <?= $p['payment_date'] ? clean(date('M j, Y', strtotime($p['payment_date']))) : '—' ?></div></div>
+              </div>
+              <strong class="text-success"><?= peso($p['payment_amount']) ?></strong>
             </div>
-            <strong class="text-success"><?= peso($p['payment_amount']) ?></strong>
-          </div>
-        <?php endforeach; ?>
-        <a href="<?= BASE_URL ?>/admin/payments.php#payments" class="footer-link">→ Open Full Payment Ledger</a>
+          <?php endforeach; ?>
+        </div>
+        <div class="panel-footer-row">
+          <a href="<?= BASE_URL ?>/admin/payments.php#payments" class="group footer-link dashboard-card-footer-link"><i class="bi bi-arrow-up-right link-arrow-icon"></i> Open Full Payment Ledger</a>
+        </div>
       </div>
     </div>
     <div class="col-lg-4">
@@ -412,7 +436,7 @@ $activityIcons = [
             <div class="text-end"><div class="text-danger fw-bold"><?= peso($o['payment_amount']) ?></div><span class="badge badge-danger">● Overdue</span></div>
           </div>
         <?php endforeach; ?>
-        <a href="<?= BASE_URL ?>/admin/notifications.php#notification-payments" class="footer-link">→ Send Payment Reminders</a>
+        <a href="<?= BASE_URL ?>/admin/notifications.php#notification-payments" class="group footer-link dashboard-card-footer-link"><i class="bi bi-arrow-up-right link-arrow-icon"></i> Send Payment Reminders</a>
       </div>
     </div>
   </div>
@@ -428,24 +452,28 @@ $activityIcons = [
 
   <div class="row g-4 mt-1">
     <div class="col-lg-8">
-      <div class="panel">
+      <div class="panel panel-spaced-footer">
         <div class="panel-header"><h2>Active Requests</h2><span class="text-muted small"><?= $openMaintenance ?> open or in-progress</span></div>
-        <?php if (!$activeMaintenanceRequests): ?><p class="text-muted mb-0">No open or in-progress requests.</p><?php endif; ?>
-        <?php foreach ($activeMaintenanceRequests as $m): ?>
-          <div class="maintenance-request-card">
-            <div class="maintenance-request-top">
-              <?php $priorityBadge = ['Urgent' => 'danger', 'High' => 'warning', 'Medium' => 'info', 'Low' => 'secondary'][$m['priority_level']] ?? 'secondary'; ?>
-              <span class="badge badge-secondary">MR-<?= str_pad((string) $m['maintenance_id'], 4, '0', STR_PAD_LEFT) ?></span>
-              <span class="badge badge-<?= $priorityBadge ?>"><?= clean($m['priority_level']) ?></span>
-              <span class="text-muted small"><?= clean(maintenance_category_bucket($m['issue_title'])) ?></span>
-              <span class="badge badge-<?= $m['status'] === 'Pending' ? 'danger' : 'info' ?> ms-auto">● <?= $m['status'] === 'Pending' ? 'Open' : 'In Progress' ?></span>
+        <?php if (!$activeMaintenanceRequests): ?><p class="text-muted my-4 panel-empty-state">No open or in-progress requests.</p><?php endif; ?>
+        <div class="panel-list">
+          <?php foreach ($activeMaintenanceRequests as $m): ?>
+            <div class="maintenance-request-card panel-list-item">
+              <div class="maintenance-request-top">
+                <?php $priorityBadge = ['Urgent' => 'danger', 'High' => 'warning', 'Medium' => 'info', 'Low' => 'secondary'][$m['priority_level']] ?? 'secondary'; ?>
+                <span class="badge badge-secondary">MR-<?= str_pad((string) $m['maintenance_id'], 4, '0', STR_PAD_LEFT) ?></span>
+                <span class="badge badge-<?= $priorityBadge ?>"><?= clean($m['priority_level']) ?></span>
+                <span class="text-muted small"><?= clean(maintenance_category_bucket($m['issue_title'])) ?></span>
+                <span class="badge badge-<?= $m['status'] === 'Pending' ? 'danger' : 'info' ?> ms-auto">● <?= $m['status'] === 'Pending' ? 'Open' : 'In Progress' ?></span>
+              </div>
+              <div class="fw-semibold"><?= clean($m['issue_title']) ?></div>
+              <div class="text-muted small"><?= clean(mb_strimwidth($m['issue_description'], 0, 90, '…')) ?></div>
+              <div class="text-muted small mt-1"><?= clean($m['first_name'] . ' ' . $m['last_name']) ?> · Room <?= clean($m['room_number']) ?></div>
             </div>
-            <div class="fw-semibold"><?= clean($m['issue_title']) ?></div>
-            <div class="text-muted small"><?= clean(mb_strimwidth($m['issue_description'], 0, 90, '…')) ?></div>
-            <div class="text-muted small mt-1"><?= clean($m['first_name'] . ' ' . $m['last_name']) ?> · Room <?= clean($m['room_number']) ?></div>
-          </div>
-        <?php endforeach; ?>
-        <a href="<?= BASE_URL ?>/admin/maintenance.php" class="footer-link">→ Open Maintenance System</a>
+          <?php endforeach; ?>
+        </div>
+        <div class="panel-footer-row">
+          <a href="<?= BASE_URL ?>/admin/maintenance.php" class="group footer-link dashboard-card-footer-link"><i class="bi bi-arrow-up-right link-arrow-icon"></i> Open Maintenance System</a>
+        </div>
       </div>
     </div>
     <div class="col-lg-4">

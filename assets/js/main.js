@@ -92,26 +92,90 @@ document.addEventListener('DOMContentLoaded', function () {
     });
   }
 
+  function getPasswordCriteria(value) {
+    return {
+      length: value.length >= 8,
+      uppercase: /[A-Z]/.test(value),
+      lowercase: /[a-z]/.test(value),
+      number: /[0-9]/.test(value),
+      special: /[^A-Za-z0-9]/.test(value)
+    };
+  }
+
+  function getPasswordStrength(score) {
+    if (score <= 0) return { label: 'Very Weak', color: '#dc3545' };
+    if (score === 1) return { label: 'Weak', color: '#f97316' };
+    if (score === 2) return { label: 'Fair', color: '#f59e0b' };
+    if (score === 3) return { label: 'Good', color: '#22c55e' };
+    return { label: 'Strong', color: '#16a34a' };
+  }
+
+  function updatePasswordStrengthMeter(input) {
+    const container = document.querySelector('[data-strength-for="' + input.id + '"]');
+    if (!container) return;
+
+    const criteria = getPasswordCriteria(input.value);
+    const strengthScore = Object.keys(criteria).filter(function (key) { return criteria[key]; }).length;
+    const strength = getPasswordStrength(strengthScore);
+    const segments = container.querySelectorAll('.strength-segment');
+    const label = container.querySelector('.strength-label');
+    const count = container.querySelector('.strength-count');
+    const checklistItems = container.closest('form') ? container.closest('form').querySelectorAll('.pass-check-item[data-requirement]') : document.querySelectorAll('.pass-check-item[data-requirement]');
+
+    segments.forEach(function (segment, index) {
+      const active = index < strengthScore;
+      segment.style.backgroundColor = active ? strength.color : '#e2e8f0';
+      segment.style.borderColor = active ? strength.color : 'rgba(148, 163, 184, 0.15)';
+      segment.style.opacity = active ? '1' : '0.8';
+    });
+
+    if (label) {
+      label.textContent = strength.label;
+      label.style.color = strength.color;
+    }
+    if (count) {
+      count.textContent = strengthScore + '/5 requirements met';
+      count.style.color = strengthScore >= 4 ? '#1e8a4c' : '#64748b';
+    }
+
+    checklistItems.forEach(function (item) {
+      const key = item.dataset.requirement;
+      const passed = Boolean(criteria[key]);
+      const icon = item.querySelector('i');
+      item.classList.toggle('is-met', passed);
+      item.classList.toggle('is-missing', !passed);
+      if (icon) {
+        icon.className = passed ? 'bi bi-check-lg' : 'bi bi-x-lg';
+      }
+    });
+  }
+
   const registerForm = document.getElementById('registerForm');
   if (registerForm) {
     registerForm.addEventListener('submit', function (event) {
       const requiredInputs = registerForm.querySelectorAll('[required]');
       let isValid = true;
-      const missingFields = [];
       requiredInputs.forEach(function (input) {
         const filled = input.value.trim() !== '' && input.checkValidity();
         input.classList.toggle('is-invalid', !filled);
-        if (!filled) { isValid = false; missingFields.push(input.dataset.fieldName || input.name || 'field'); }
+        if (!filled) isValid = false;
       });
+
       const password = document.getElementById('regPassword') || document.getElementById('password');
       const confirmPassword = document.getElementById('regConfirmPassword') || document.getElementById('confirm_password');
-      const value = password ? password.value : '';
-      const metCount = [/.{8,}/, /[A-Z]/, /[a-z]/, /[0-9]/, /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/].filter(function (rule) { return rule.test(value); }).length;
-      if (!password || !confirmPassword || metCount !== 5 || password.value !== confirmPassword.value) isValid = false;
+      if (password && confirmPassword) {
+        const criteria = getPasswordCriteria(password.value);
+        const meetsAllRules = Object.keys(criteria).every(function (key) { return criteria[key]; });
+        if (!meetsAllRules || password.value !== confirmPassword.value) isValid = false;
+      }
+
       if (!isValid) {
         event.preventDefault();
         const notice = document.getElementById('formErrorNotice');
-        if (notice) { notice.textContent = password && confirmPassword && password.value !== confirmPassword.value ? 'Password and Confirm Password do not match.' : 'Please fill in all required details correctly before creating your account.'; notice.classList.remove('d-none'); }
+        if (notice) {
+          notice.textContent = password && confirmPassword && password.value && confirmPassword.value && password.value !== confirmPassword.value ? 'Password and Confirm Password do not match.' : 'Please fill in all required details correctly before creating your account.';
+          notice.classList.remove('d-none');
+        }
       }
     });
   }
@@ -129,37 +193,9 @@ document.addEventListener('DOMContentLoaded', function () {
   });
 
   document.querySelectorAll('.js-password-strength').forEach(function (input) {
-    const container = document.querySelector('[data-strength-for="' + input.id + '"]');
-    if (!container) return;
-    const rules = {
-      length: /.{8,}/,
-      uppercase: /[A-Z]/,
-      lowercase: /[a-z]/,
-      number: /[0-9]/,
-      special: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/
-    };
-    const levels = [
-      ['Very Weak', '#dc3545'], ['Weak', '#fd7e14'], ['Medium', '#ffc107'],
-      ['Strong', '#0d6efd'], ['Very Strong', '#198754']
-    ];
+    updatePasswordStrengthMeter(input);
     input.addEventListener('input', function () {
-      const value = input.value;
-      const keys = Object.keys(rules);
-      const met = keys.filter(function (key) { return rules[key].test(value); }).length;
-      const level = levels[Math.max(0, met - 1)];
-      const label = container.querySelector('.strength-label, #strengthText');
-      const count = container.querySelector('.strength-count');
-      if (label) { label.textContent = level[0]; label.style.color = level[1]; }
-      if (count) count.textContent = met + '/5 requirements met';
-      container.querySelectorAll('.strength-bars .bar, .password-strength-meter .strength-segment').forEach(function (bar, index) {
-        bar.style.backgroundColor = index < met ? level[1] : '#e0e0e0';
-      });
-      document.querySelectorAll('[data-requirement]').forEach(function (item) {
-        const valid = rules[item.dataset.requirement].test(value);
-        item.classList.toggle('text-success', valid);
-        item.classList.toggle('fw-semibold', valid);
-        item.querySelector('.icon-status').className = valid ? 'bi bi-check-circle-fill icon-status text-success' : 'bi bi-x icon-status text-muted';
-      });
+      updatePasswordStrengthMeter(input);
     });
   });
 
@@ -190,6 +226,8 @@ document.addEventListener('DOMContentLoaded', function () {
   // ---- Show/hide toggle on every password field ------------------------
   document.querySelectorAll('input[type="password"]').forEach(function (input) {
     if (input.closest('.input-field-wrapper')) return;
+    if (input.closest('.input-group') && input.parentElement.querySelector('.toggle-password, .btn-toggle-eye, .pw-toggle, .js-toggle-pwd, .js-toggle-password-btn')) return;
+    if (input.parentElement && input.parentElement.querySelector('.toggle-password, .btn-toggle-eye, .pw-toggle, .js-toggle-pwd, .js-toggle-password-btn')) return;
     let wrapper = input.parentElement;
     if (!wrapper.classList.contains('input-icon')) {
       wrapper = document.createElement('div');

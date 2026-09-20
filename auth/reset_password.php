@@ -8,6 +8,14 @@ if (is_logged_in()) {
 $errors = [];
 $success = false;
 $oldEmail = str_input($_GET, 'email');
+if ($oldEmail === '' && !empty($_SESSION['reset_email'])) {
+    $oldEmail = (string) $_SESSION['reset_email'];
+} elseif ($oldEmail === '' && !empty($_SESSION['email'])) {
+    $oldEmail = (string) $_SESSION['email'];
+}
+if ($oldEmail !== '') {
+    $_SESSION['reset_email'] = $oldEmail;
+}
 $demoOtp = preg_replace('/\D+/', '', (string) ($_SESSION['demo_otp'] ?? '138651'));
 if (strlen($demoOtp) !== 6) {
     $demoOtp = '138651';
@@ -137,10 +145,10 @@ include __DIR__ . '/../includes/header.php';
 
           <div class="password-field-wrap mb-3">
             <label class="form-label fw-bold text-dark small mb-1">Create New Password <span class="text-danger">*</span></label>
-            <div class="input-group overflow-hidden rounded-3 border">
-              <span class="input-group-text bg-light border-0 text-muted ps-3"><i class="bi bi-lock-fill"></i></span>
-              <input type="password" id="newPassword" name="new_password" class="form-control border-0 bg-light shadow-none" placeholder="••••••••" value="" autocomplete="new-password" required>
-              <button type="button" class="btn btn-light border-0 text-muted px-3 toggle-password" data-target="newPassword"><i class="bi bi-eye"></i></button>
+            <div class="password-input-shell">
+              <span class="password-input-icon"><i class="bi bi-lock-fill"></i></span>
+              <input type="password" id="newPassword" name="new_password" class="password-input" placeholder="••••••••" value="" autocomplete="new-password" required>
+              <button type="button" class="toggle-password" data-target="newPassword" aria-label="Show password"><i class="bi bi-eye"></i></button>
             </div>
 
             <div class="strength-bar-container d-flex gap-1 mt-2">
@@ -168,10 +176,10 @@ include __DIR__ . '/../includes/header.php';
 
           <div class="password-field-wrap mb-4">
             <label class="form-label fw-bold text-dark small mb-1">Confirm New Password <span class="text-danger">*</span></label>
-            <div class="input-group overflow-hidden rounded-3 border">
-              <span class="input-group-text bg-light border-0 text-muted ps-3"><i class="bi bi-lock-fill"></i></span>
-              <input type="password" id="confirmPassword" name="confirm_password" class="form-control border-0 bg-light shadow-none" placeholder="••••••••" value="" autocomplete="new-password" required>
-              <button type="button" class="btn btn-light border-0 text-muted px-3 toggle-password" data-target="confirmPassword"><i class="bi bi-eye"></i></button>
+            <div class="password-input-shell">
+              <span class="password-input-icon"><i class="bi bi-lock-fill"></i></span>
+              <input type="password" id="confirmPassword" name="confirm_password" class="password-input" placeholder="••••••••" value="" autocomplete="new-password" required>
+              <button type="button" class="toggle-password" data-target="confirmPassword" aria-label="Show password"><i class="bi bi-eye"></i></button>
             </div>
           </div>
 
@@ -186,13 +194,20 @@ include __DIR__ . '/../includes/header.php';
             <span>Reset Password &amp; Log In</span>
           </button>
         </form>
+
+        <div class="request-new-code-wrap">
+          <div class="request-new-code-shell">
+            <span class="request-new-code-label">Didn't get a code?</span>
+            <button type="button" id="resendCodeBtn" class="request-new-code-btn" data-email="<?= clean($oldEmail) ?>" aria-label="Request a new code">
+              Request a new one
+            </button>
+          </div>
+        </div>
+
         <form method="post" action="<?= BASE_URL ?>/auth/forgot_password.php" id="resendForm" style="display:none">
           <?= csrf_field() ?>
           <input type="hidden" name="email" value="<?= clean($oldEmail) ?>">
         </form>
-        <p class="text-center mt-3 mb-0">
-          Didn't get a code? <a href="<?= BASE_URL ?>/auth/forgot_password.php">Request a new one</a>
-        </p>
       <?php endif; ?>
     </div>
   </div>
@@ -331,21 +346,92 @@ $extraScripts = <<<'HTML'
   const resendSeconds = document.getElementById('resendSeconds');
   const resendBtn = document.getElementById('resendBtn');
   const resendForm = document.getElementById('resendForm');
+  const requestNewCodeBtn = document.getElementById('resendCodeBtn') || document.getElementById('requestNewCodeBtn');
   let remaining = 60;
-  const tick = setInterval(function () {
-    remaining -= 1;
-    if (remaining <= 0) {
-      clearInterval(tick);
-      resendTimer.style.display = 'none';
-      resendBtn.style.display = '';
-      resendBtn.disabled = false;
-    } else {
-      resendSeconds.textContent = remaining;
+
+  function startResendTimer() {
+    if (!resendTimer || !resendSeconds || !resendBtn) return;
+
+    if (window.__otpResendTimer) {
+      clearInterval(window.__otpResendTimer);
     }
-  }, 1000);
-  resendBtn.addEventListener('click', function () {
-    resendForm.submit();
-  });
+
+    remaining = 60;
+    resendTimer.style.display = '';
+    resendBtn.style.display = 'none';
+    resendBtn.disabled = true;
+    resendSeconds.textContent = remaining;
+
+    const tick = setInterval(function () {
+      remaining -= 1;
+      if (remaining <= 0) {
+        clearInterval(tick);
+        resendTimer.style.display = 'none';
+        resendBtn.style.display = '';
+        resendBtn.disabled = false;
+        return;
+      }
+      resendSeconds.textContent = remaining;
+    }, 1000);
+
+    window.__otpResendTimer = tick;
+  }
+
+  if (resendBtn && resendForm) {
+    resendBtn.addEventListener('click', function () {
+      resendForm.submit();
+    });
+  }
+
+  if (requestNewCodeBtn) {
+    requestNewCodeBtn.addEventListener('click', async function (event) {
+      event.preventDefault();
+
+      const email = requestNewCodeBtn.dataset.email || '';
+      const csrfToken = document.querySelector('input[name="csrf_token"]')?.value || '';
+
+      if (!email) {
+        window.alert('The user email could not be found. Please return to Step 1 and try again.');
+        return;
+      }
+
+      try {
+        const response = await fetch('<?= BASE_URL ?>/auth/resend_otp.php', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          body: new URLSearchParams({
+            action: 'resend_otp',
+            email: email,
+            csrf_token: csrfToken
+          }).toString()
+        });
+
+        let payload = {};
+        try {
+          payload = await response.json();
+        } catch (jsonError) {
+          console.error('Resend OTP: invalid JSON response', jsonError);
+        }
+
+        if (!response.ok || payload.success === false) {
+          const message = payload.message || 'We could not send a new code right now. Please try again.';
+          console.error('Resend OTP failed:', { status: response.status, payload, message });
+          throw new Error(message);
+        }
+
+        startResendTimer();
+        window.alert(payload.message || 'A new verification code has been sent to ' + email + '.');
+      } catch (error) {
+        console.error('Resend OTP failed:', error);
+        window.alert(error.message || 'We could not send a new code right now. Please try again.');
+      }
+    });
+  }
+
+  startResendTimer();
 
   // ---- Password strength + requirement checklist ----
   const newPass = document.getElementById('newPassword');

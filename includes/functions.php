@@ -153,21 +153,39 @@ function peso($amount): string
     return '₱' . number_format((float) $amount, 2);
 }
 
-/** Human-readable "X minutes/hours/days ago" for a datetime string. */
-function time_ago(string $datetime): string
+/** Human-readable relative time for past events. */
+function time_ago(?string $datetime): string
 {
-    $diff = time() - strtotime($datetime);
-    if ($diff < 60) return 'just now';
+    if ($datetime === null || trim($datetime) === '') {
+        return 'Just now';
+    }
+
+    $timestamp = strtotime($datetime);
+    if ($timestamp === false) {
+        return 'Just now';
+    }
+
+    $diff = time() - $timestamp;
+    if ($diff < 60) {
+        return 'Just now';
+    }
+
     $mins = (int) floor($diff / 60);
-    if ($mins < 60) return $mins . ' minute' . ($mins === 1 ? '' : 's') . ' ago';
+    if ($mins < 60) {
+        return $mins . ' mins ago';
+    }
+
     $hours = (int) floor($mins / 60);
-    if ($hours < 24) return $hours . ' hour' . ($hours === 1 ? '' : 's') . ' ago';
+    if ($hours < 24) {
+        return $hours . ' hour' . ($hours === 1 ? '' : 's') . ' ago';
+    }
+
     $days = (int) floor($hours / 24);
-    if ($days < 30) return $days . ' day' . ($days === 1 ? '' : 's') . ' ago';
-    $months = (int) floor($days / 30);
-    if ($months < 12) return $months . ' month' . ($months === 1 ? '' : 's') . ' ago';
-    $years = (int) floor($months / 12);
-    return $years . ' year' . ($years === 1 ? '' : 's') . ' ago';
+    if ($days < 2) {
+        return date('g:i A', $timestamp);
+    }
+
+    return date('M j, g:i A', $timestamp);
 }
 
 // issue_title is picked from a fixed dropdown of trade-like values
@@ -529,7 +547,7 @@ function sync_pending_gcash_payments(PDO $db, int $tenantId): int
 function log_activity(PDO $db, string $type, string $description, ?int $tenantId = null): void
 {
     try {
-        $db->prepare('INSERT INTO activity_log (activity_type, description, related_tenant_id) VALUES (?,?,?)')
+        $db->prepare('INSERT INTO activity_log (activity_type, description, related_tenant_id, created_at) VALUES (?,?,?,NOW())')
            ->execute([$type, $description, $tenantId]);
     } catch (PDOException $e) {
         error_log('log_activity failed: ' . $e->getMessage());

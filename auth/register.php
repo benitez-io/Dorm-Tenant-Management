@@ -167,16 +167,34 @@ include __DIR__ . '/../includes/header.php';
         <div class="row g-3 mt-0">
           <div class="col-md-6">
             <label class="form-label">Password <span class="text-danger">*</span></label>
-            <input type="password" name="password" id="regPassword" class="form-control js-password-strength" data-strength-for="regPassword" value="" autocomplete="new-password" minlength="8" required>
+            <div class="input-field-wrapper position-relative">
+              <i class="bi bi-lock field-icon-left"></i>
+              <input type="password" name="password" id="regPassword" class="form-control custom-input px-5 js-password-strength" data-strength-for="regPassword" value="" autocomplete="new-password" minlength="8" placeholder="Enter a strong password" required>
+              <button type="button" class="btn-toggle-eye js-toggle-pwd" data-target="regPassword" aria-label="Toggle password visibility"><i class="bi bi-eye"></i></button>
+            </div>
           </div>
           <div class="col-md-6">
             <label class="form-label">Confirm Password <span class="text-danger">*</span></label>
-            <input type="password" name="confirm_password" id="regConfirmPassword" class="form-control" value="" autocomplete="new-password" minlength="8" required>
+            <div class="input-field-wrapper position-relative">
+              <i class="bi bi-lock field-icon-left"></i>
+              <input type="password" name="confirm_password" id="regConfirmPassword" class="form-control custom-input px-5" value="" autocomplete="new-password" minlength="8" placeholder="Re-enter your password" required>
+              <button type="button" class="btn-toggle-eye js-toggle-pwd" data-target="regConfirmPassword" aria-label="Toggle password visibility"><i class="bi bi-eye"></i></button>
+            </div>
           </div>
         </div>
-        <div class="strength-meter-container mt-2 mb-3" data-strength-for="regPassword">
+        <div class="strength-meter-container mt-2 mb-2" data-strength-for="regPassword">
           <div class="password-strength-meter d-flex gap-1"><div class="strength-segment flex-fill rounded-pill"></div><div class="strength-segment flex-fill rounded-pill"></div><div class="strength-segment flex-fill rounded-pill"></div><div class="strength-segment flex-fill rounded-pill"></div><div class="strength-segment flex-fill rounded-pill"></div></div>
           <div class="d-flex justify-content-between align-items-center mt-1"><span class="strength-label small fw-bold text-danger">Very Weak</span><span class="strength-count small text-muted">0/5 requirements met</span></div>
+        </div>
+        <div class="password-requirements-box mb-3">
+          <p class="password-rule-hint mb-2">Must be ≥8 characters, contain uppercase, lowercase, a number, and a special character (e.g., Hrm@2026!).</p>
+          <ul class="password-checklist mb-0">
+            <li class="pass-check-item" data-requirement="length"><span class="checkmark"><i class="bi bi-x-lg"></i></span><span>At least 8 characters</span></li>
+            <li class="pass-check-item" data-requirement="uppercase"><span class="checkmark"><i class="bi bi-x-lg"></i></span><span>Uppercase letter (A–Z)</span></li>
+            <li class="pass-check-item" data-requirement="lowercase"><span class="checkmark"><i class="bi bi-x-lg"></i></span><span>Lowercase letter (a–z)</span></li>
+            <li class="pass-check-item" data-requirement="number"><span class="checkmark"><i class="bi bi-x-lg"></i></span><span>Number (0–9)</span></li>
+            <li class="pass-check-item" data-requirement="special"><span class="checkmark"><i class="bi bi-x-lg"></i></span><span>Special character (@!#...)</span></li>
+          </ul>
         </div>
         <hr class="my-3">
         <p class="text-muted small mb-2">Emergency contact (optional, but recommended)</p>
@@ -191,7 +209,7 @@ include __DIR__ . '/../includes/header.php';
           </div>
         </div>
         <div class="policy-notice-box p-3 rounded-4 border d-flex align-items-start gap-2 my-3"><i class="bi bi-info-circle text-muted fs-5 flex-shrink-0 mt-1"></i><p class="text-secondary xs-text mb-0">By creating an account, you agree to the dorm management policies and confirm that the information provided is accurate.</p></div>
-        <button type="submit" class="btn btn-maroon w-100 py-3 rounded-pill fw-bold text-white d-flex align-items-center justify-content-center gap-2 shadow-sm"><i class="bi bi-person-check fs-5"></i><span>Create Account</span><i class="bi bi-arrow-right fs-6"></i></button>
+        <button type="submit" class="btn btn-maroon w-100 py-3 rounded-pill fw-bold text-white d-flex align-items-center justify-content-center gap-2 shadow-sm"><i class="bi bi-person-check fs-5"></i><span>Create Account</span><i class="bi bi-arrow-up-right fs-6 link-arrow-icon"></i></button>
       </form>
     </div>
   </div>

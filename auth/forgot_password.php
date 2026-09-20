@@ -25,6 +25,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($secondsLeft <= 14 * 60) {
                 $otp = (string) random_int(100000, 999999);
                 $_SESSION['demo_otp'] = $otp;
+                $_SESSION['reset_email'] = $email;
+                $_SESSION['otp_last_sent_at'] = time();
                 $expires = date('Y-m-d H:i:s', time() + 15 * 60);
                 get_db()->prepare('UPDATE users SET reset_otp = ?, reset_otp_expires = ? WHERE user_id = ?')
                         ->execute([$otp, $expires, $user['user_id']]);
@@ -98,7 +100,18 @@ include __DIR__ . '/../includes/header.php';
           </div>
           <button type="submit" class="btn btn-maroon-solid w-100 rounded-pill fw-bold">Send Verification Code</button>
         </form>
-        <p class="text-center mt-3 mb-0">Remembered your password? <a href="<?= BASE_URL ?>/auth/login.php">Sign in</a></p>
+
+        <div style="display: flex; justify-content: center; align-items: center; width: 100%; margin: 20px auto 0;">
+          <div style="display: inline-flex; align-items: center; gap: 12px; padding: 6px 6px 6px 20px; background: #fdf2f2; border: 1px solid #f3d0d0; border-radius: 9999px;">
+            <span style="color: #4b5563; font-size: 14px; font-weight: 500;">Remembered your password?</span>
+            <a href="<?= BASE_URL ?>/auth/login.php"
+               style="display: inline-flex; align-items: center; justify-content: center; background-color: #ffffff; color: #800000; font-weight: 700; font-size: 14px; border-radius: 9999px; padding: 6px 18px; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08); text-decoration: none; cursor: pointer; transition: all 0.2s ease;"
+               onmouseover="this.style.backgroundColor='#f9fafb'; this.style.textDecoration='none';"
+               onmouseout="this.style.backgroundColor='#ffffff'; this.style.textDecoration='none';">
+              Sign in
+            </a>
+          </div>
+        </div>
       <?php endif; ?>
     </div>
   </div>
