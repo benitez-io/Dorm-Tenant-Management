@@ -97,7 +97,7 @@ render_module_tabs([
           <tr>
             <td>
               <div class="cell-person">
-                <div class="user-avatar-md" style="color:var(--maroon);background:var(--maroon-soft);"><?= clean(strtoupper(substr($t['first_name'], 0, 1))) ?></div>
+                <div class="applicant-avatar"><i class="bi bi-person-fill"></i></div>
                 <div><?= clean($t['first_name'] . ' ' . $t['last_name']) ?><div class="sub">Since <?= clean(date('n/j/Y', strtotime($t['date_registered']))) ?></div></div>
               </div>
             </td>

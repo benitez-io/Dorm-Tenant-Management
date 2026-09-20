@@ -40,19 +40,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $roomId   = (int) ($_POST['room_id'] ?? 0);
         $tenantId = (int) ($_POST['tenant_id'] ?? 0);
 
-        $room = $db->prepare('SELECT * FROM dorm_rooms WHERE room_id = ?');
+        $db->beginTransaction();
+        $room = $db->prepare('SELECT r.*, (SELECT COUNT(*) FROM tenants t WHERE t.room_id = r.room_id AND t.status = "Active") AS occupancy_count FROM dorm_rooms r WHERE r.room_id = ? FOR UPDATE');
         $room->execute([$roomId]);
         $room = $room->fetch();
 
-        if (!$room || $room['status'] !== 'Available') {
+        if (!$room || !in_array($room['status'], ['Available', 'Occupied'], true) || (int) $room['occupancy_count'] >= (int) $room['capacity']) {
+            $db->rollBack();
             flash('error', 'That room is no longer available.');
         } elseif ($tenantId <= 0) {
+            $db->rollBack();
             flash('error', 'Please choose a tenant to assign.');
         } else {
-            $db->beginTransaction();
             try {
                 $db->prepare('UPDATE tenants SET room_id = ? WHERE tenant_id = ?')->execute([$roomId, $tenantId]);
-                $db->prepare('UPDATE dorm_rooms SET status = "Occupied" WHERE room_id = ?')->execute([$roomId]);
+                $newOccupancy = (int) $room['occupancy_count'] + 1;
+                $newStatus = $newOccupancy >= (int) $room['capacity'] ? 'Occupied' : 'Available';
+              $db->prepare('UPDATE dorm_rooms SET status = ? WHERE room_id = ?')->execute([$newStatus, $roomId]);
                 $db->commit();
                 flash('success', 'Tenant assigned to Room ' . $room['room_number'] . '.');
             } catch (Exception $e) {
@@ -71,7 +75,9 @@ $occupied    = (int) $db->query("SELECT COUNT(*) c FROM dorm_rooms WHERE status=
 $occupancyRate = $totalRooms > 0 ? round(($occupied / $totalRooms) * 100) : 0;
 
 $rooms = $db->query("
-    SELECT r.*, u.first_name, u.last_name
+  SELECT r.*,
+       (SELECT COUNT(*) FROM tenants t2 WHERE t2.room_id = r.room_id AND t2.status = 'Active') AS occupancy_count,
+       u.first_name, u.last_name
     FROM dorm_rooms r
     LEFT JOIN tenants t ON t.room_id = r.room_id AND t.status = 'Active'
     LEFT JOIN users u ON u.user_id = t.user_id
@@ -137,7 +143,8 @@ render_module_tabs([
   foreach ($rooms as $r) { $byFloor[(int) $r['floor_number']][] = $r; }
   krsort($byFloor);
 
-  function render_room_card(array $r): void {
+  function render_room_card(array $r, string $mode): void {
+    $isAssignMode = $mode === 'assign';
     ?>
     <div class="room-card">
       <div class="room-card-top">
@@ -147,21 +154,23 @@ render_module_tabs([
       <div class="text-muted small"><?= clean($r['room_type']) ?></div>
       <div class="room-card-rate"><?= peso($r['monthly_rate']) ?><span class="text-muted fw-normal">/mo</span></div>
       <div class="text-muted small mt-1">Capacity: <?= (int) $r['capacity'] ?></div>
-      <?php if ($r['first_name']): ?>
+      <?php if ($r['first_name'] && !$isAssignMode): ?>
         <div class="small mt-2"><i class="bi bi-person-fill"></i> <?= clean($r['first_name'] . ' ' . $r['last_name']) ?></div>
-      <?php elseif ($r['status'] === 'Available'): ?>
-        <div class="room-card-actions">
-          <button type="button" class="btn btn-sm btn-maroon" data-bs-toggle="modal" data-bs-target="#assignModal"
-            data-room-id="<?= $r['room_id'] ?>" data-room-number="<?= clean($r['room_number']) ?>">Assign</button>
-        </div>
+      <?php elseif ($isAssignMode): ?>
+        <div class="small mt-2"><i class="bi bi-people-fill"></i> <?= (int) $r['occupancy_count'] ?> / <?= (int) $r['capacity'] ?> occupied</div>
       <?php else: ?>
         <div class="small mt-2"><span class="badge badge-<?= status_badge_class($r['status']) ?>"><?= clean($r['status']) ?></span></div>
       <?php endif; ?>
-      <div class="room-card-actions mt-2">
-        <button type="button" class="btn btn-sm btn-outline-maroon edit-room-btn" data-bs-toggle="modal" data-bs-target="#roomModal"
+      <div class="room-card-actions">
+        <?php if ($isAssignMode): ?>
+        <button type="button" class="btn btn-full btn-assign btn-maroon" data-bs-toggle="modal" data-bs-target="#assignModal"
+          data-room-id="<?= $r['room_id'] ?>" data-room-number="<?= clean($r['room_number']) ?>">Assign Tenant</button>
+        <?php else: ?>
+        <button type="button" class="btn btn-full btn-edit btn-outline-maroon edit-room-btn" data-bs-toggle="modal" data-bs-target="#roomModal"
           data-id="<?= $r['room_id'] ?>" data-number="<?= clean($r['room_number']) ?>" data-type="<?= clean($r['room_type']) ?>"
           data-capacity="<?= (int) $r['capacity'] ?>" data-rate="<?= clean((string) $r['monthly_rate']) ?>" data-floor="<?= (int) $r['floor_number'] ?>"
           data-description="<?= clean($r['description'] ?? '') ?>">Edit</button>
+        <?php endif; ?>
       </div>
     </div>
     <?php
@@ -171,11 +180,11 @@ render_module_tabs([
 <?php if ($activeTab === 'rooms'): ?>
   <div class="panel mt-2" id="rooms">
     <div class="panel-header"><h2>Room Grid</h2></div>
-    <?php foreach ($byFloor as $floorNum => $floorRooms): ?>
+          <?php foreach ($byFloor as $floorNum => $floorRooms): ?>
       <div class="floor-group">
         <div class="floor-label">Floor <?= $floorNum ?></div>
         <div class="room-grid">
-          <?php foreach ($floorRooms as $r): render_room_card($r); endforeach; ?>
+          <?php foreach ($floorRooms as $r): render_room_card($r, 'inventory'); endforeach; ?>
         </div>
       </div>
     <?php endforeach; ?>
@@ -186,11 +195,11 @@ render_module_tabs([
   <div class="row g-4 mt-0" id="rooms">
     <div class="col-lg-8">
       <div class="panel">
-        <div class="panel-header"><h2>Available Rooms</h2><span class="text-muted small"><?= $available ?> ready to assign</span></div>
-        <?php $availableRooms = array_filter($rooms, fn($r) => $r['status'] === 'Available'); ?>
+        <?php $availableRooms = array_filter($rooms, fn($r) => in_array($r['status'], ['Available', 'Occupied'], true) && (int) $r['occupancy_count'] < (int) $r['capacity']); ?>
+        <div class="panel-header"><h2>Available Rooms</h2><span class="text-muted small"><?= count($availableRooms) ?> ready to assign</span></div>
         <?php if (!$availableRooms): ?><p class="text-muted text-center py-4">No available rooms right now.</p><?php endif; ?>
         <div class="room-grid">
-          <?php foreach ($availableRooms as $r): render_room_card($r); endforeach; ?>
+          <?php foreach ($availableRooms as $r): render_room_card($r, 'assign'); endforeach; ?>
         </div>
       </div>
     </div>

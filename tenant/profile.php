@@ -99,7 +99,7 @@ include __DIR__ . '/../includes/header.php';
     <div class="row g-3">
       <div class="col-md-6">
         <label class="form-label">New Password <span class="text-muted">(leave blank to keep current)</span></label>
-        <input type="password" class="form-control" name="new_password" minlength="8">
+        <input type="password" class="form-control" name="new_password" value="" autocomplete="new-password" minlength="8">
       </div>
     </div>
   </div>

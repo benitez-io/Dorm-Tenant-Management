@@ -24,12 +24,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $secondsLeft = $user['reset_otp_expires'] ? strtotime($user['reset_otp_expires']) - time() : 0;
             if ($secondsLeft <= 14 * 60) {
                 $otp = (string) random_int(100000, 999999);
+                $_SESSION['demo_otp'] = $otp;
                 $expires = date('Y-m-d H:i:s', time() + 15 * 60);
                 get_db()->prepare('UPDATE users SET reset_otp = ?, reset_otp_expires = ? WHERE user_id = ?')
                         ->execute([$otp, $expires, $user['user_id']]);
 
                 $body = "Hi {$user['first_name']}, use this code to reset your password:\n\n{$otp}\n\nThis code expires in 15 minutes. If you didn't request this, you can safely ignore this email.";
-                send_email_alert($user['email'], $user['first_name'], 'Your password reset code', email_template('Reset your password', $body));
+                if (!send_email_alert($user['email'], $user['first_name'], 'Your password reset code', email_template('Reset your password', $body))) {
+                  get_db()->prepare('UPDATE users SET reset_otp = NULL, reset_otp_expires = NULL WHERE user_id = ?')->execute([$user['user_id']]);
+                  flash('error', 'We could not send the verification email. Please try again later.');
+                  $sent = false;
+                  goto render_forgot_password;
+                }
             }
         }
         // Same message whether or not the email exists — otherwise this page
@@ -40,23 +46,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+render_forgot_password:
 $pageTitle = 'Forgot Password';
 include __DIR__ . '/../includes/header.php';
 ?>
-<div class="auth-screen">
+<div class="auth-screen auth-page auth-recovery">
+  <canvas id="auth-bg-canvas" aria-hidden="true"></canvas>
   <div class="auth-panel">
-    <div class="auth-panel-left">
-      <span class="brand-icon-lg"><i class="bi bi-mortarboard-fill"></i></span>
-      <h1>Dorm Tenant Management</h1>
-      <p>Forgot your password? We'll email you a code to reset it.</p>
+    <div class="auth-panel-left auth-sidebar register-style-sidebar">
+      <div class="sidebar-circle-accent"></div>
+      <div class="position-relative z-1">
+        <div class="sidebar-icon-wrapper mb-3 d-flex align-items-center justify-content-center rounded-3"><i class="bi bi-mortarboard-fill fs-4 text-white"></i></div>
+        <h2 class="fw-bold fs-4 text-white mb-1">Dorm Tenant<br>Management System</h2>
+      </div>
     </div>
-    <div class="auth-panel-right">
+    <div class="auth-panel-right auth-content">
       <a href="<?= BASE_URL ?>/auth/login.php" class="recovery-back"><i class="bi bi-arrow-left"></i> Back to Login</a>
 
       <div class="recovery-header">
         <span class="recovery-icon"><i class="bi bi-arrow-repeat"></i></span>
         <div>
           <h2>Password Recovery</h2>
+          <p class="recovery-subtitle">Enter your registered email to receive a 6-digit verification code.</p>
           <div class="step-caption">
             <span class="step-track"><span class="bar active"></span><span class="bar"></span></span>
             Step 1 of 2
@@ -67,10 +78,9 @@ include __DIR__ . '/../includes/header.php';
       <?php if ($sent): ?>
         <div class="callout callout-success">
           <i class="bi bi-check-circle-fill"></i>
-          <div>If that email is registered, we've sent a 6-digit verification code to it. Enter it on the next step along with your new password.</div>
+          <div>Verification code sent. It expires in 15 minutes.</div>
         </div>
-        <a href="<?= BASE_URL ?>/auth/reset_password.php?email=<?= urlencode($oldEmail) ?>" class="btn btn-maroon w-100">Enter Code</a>
-        <p class="text-center mt-3 mb-0"><a href="<?= BASE_URL ?>/auth/login.php">Back to Sign In</a></p>
+        <a href="<?= BASE_URL ?>/auth/reset_password.php?email=<?= urlencode($oldEmail) ?>" class="btn btn-maroon-solid w-100 rounded-pill fw-bold">Enter Verification Code</a>
       <?php else: ?>
         <div class="callout callout-info">
           <i class="bi bi-info-circle-fill"></i>
@@ -86,11 +96,12 @@ include __DIR__ . '/../includes/header.php';
               <input type="email" name="email" class="form-control" placeholder="Enter your email" value="<?= clean($oldEmail) ?>" required autofocus>
             </div>
           </div>
-          <button type="submit" class="btn btn-maroon w-100">Send Verification Code</button>
+          <button type="submit" class="btn btn-maroon-solid w-100 rounded-pill fw-bold">Send Verification Code</button>
         </form>
         <p class="text-center mt-3 mb-0">Remembered your password? <a href="<?= BASE_URL ?>/auth/login.php">Sign in</a></p>
       <?php endif; ?>
     </div>
   </div>
+  <footer class="auth-global-footer text-center"><p class="xxs-text text-white-50 mb-0">&copy; 2026 Teen T-ITans &middot; Dorm Tenant Management System</p></footer>
 </div>
 <?php include __DIR__ . '/../includes/footer.php'; ?>

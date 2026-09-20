@@ -48,6 +48,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    if ($action === 'delete') {
+        $id = (int) ($_POST['user_id'] ?? 0);
+        if ($id === current_user_id()) {
+            flash('error', "You can't delete your own account while logged in.");
+        } else {
+            try {
+                $db->beginTransaction();
+                $db->prepare('DELETE FROM notifications WHERE sender_id = ?')->execute([$id]);
+                $db->prepare('DELETE FROM reports WHERE generated_by = ?')->execute([$id]);
+                $db->prepare('DELETE FROM users WHERE user_id = ?')->execute([$id]);
+                $db->commit();
+                flash('success', 'Account deleted.');
+            } catch (Throwable $e) {
+                if ($db->inTransaction()) {
+                    $db->rollBack();
+                }
+                flash('error', 'Account could not be deleted. Please try again.');
+            }
+        }
+    }
+
     redirect('/admin/credentials.php');
 }
 
@@ -111,6 +132,14 @@ render_module_tabs([
                 <input type="hidden" name="user_id" value="<?= $u['user_id'] ?>">
                 <button class="btn btn-icon" title="<?= $u['is_active'] ? 'Deactivate' : 'Reactivate' ?>"><?= $u['is_active'] ? '<i class="bi bi-slash-circle"></i>' : '<i class="bi bi-check-circle-fill"></i>' ?></button>
               </form>
+              <?php if ((int) $u['user_id'] !== current_user_id()): ?>
+              <form method="post" class="d-inline" onsubmit="return confirm('Permanently delete this account? Its tenant records, payments, contracts, and maintenance history will also be deleted. This cannot be undone.');">
+                <?= csrf_field() ?>
+                <input type="hidden" name="action" value="delete">
+                <input type="hidden" name="user_id" value="<?= $u['user_id'] ?>">
+                <button class="btn btn-icon text-danger" title="Delete account" aria-label="Delete account"><i class="bi bi-trash3"></i></button>
+              </form>
+              <?php endif; ?>
             </td>
           </tr>
         <?php endforeach; ?>
@@ -137,7 +166,7 @@ render_module_tabs([
           <div class="mb-3 mt-3"><label class="form-label">Email Address</label><input type="email" class="form-control" name="email" id="edit_email" required></div>
           <div class="mb-3">
             <label class="form-label">New Password <span class="text-muted">(leave blank to keep current)</span></label>
-            <input type="password" class="form-control" name="new_password" minlength="8">
+            <input type="password" class="form-control" name="new_password" value="" autocomplete="new-password" minlength="8">
           </div>
           <div class="mb-1">
             <label class="form-label">Role</label>

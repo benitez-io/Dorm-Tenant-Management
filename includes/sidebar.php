@@ -37,7 +37,7 @@ $tenantLinks = [
   <div class="sidebar-brand">
     <span class="brand-icon"><i class="bi bi-mortarboard-fill"></i></span>
     <?php if ($role === 'admin'): ?>
-      <div><div class="brand-title">Dorm Tenant</div><div class="brand-title">Management System</div></div>
+      <div class="sidebar-brand-text"><div class="sidebar-brand-title">Dorm Tenant</div><div class="sidebar-brand-subtitle">Management System</div></div>
     <?php else: ?>
       <div class="brand-subtitle">Tenant Portal</div>
     <?php endif; ?>

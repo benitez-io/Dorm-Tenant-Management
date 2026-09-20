@@ -87,7 +87,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             email_template('You\'re approved!', "Hi {$tenant['first_name']}, your tenant application has been approved. We'll notify you again once a room is assigned."));
     }
 
-    if ($action === 'reject') {
+    if ($action === 'reject' || $action === 'decline') {
         $reason = str_input($_POST, 'reason');
         $db->prepare("UPDATE tenants SET approval_status = 'Rejected', rejection_reason = ? WHERE tenant_id = ?")
            ->execute([$reason ?: null, $tenantId]);

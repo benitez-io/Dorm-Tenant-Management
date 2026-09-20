@@ -303,7 +303,7 @@ $activityIcons = [
               <div class="activity-icon"><i class="bi <?= $activityIcons[$a['activity_type']] ?? 'bi-info-circle-fill' ?>"></i></div>
               <div class="flex-grow-1">
                 <div><?= clean($a['description']) ?></div>
-                <div class="text-muted small"><?= clean(time_ago($a['created_at'])) ?></div>
+                <div class="text-muted small js-relative-time" data-relative-time="<?= clean(date('c', strtotime($a['created_at']))) ?>"><?= clean(time_ago($a['created_at'])) ?></div>
               </div>
             </div>
           <?php endforeach; ?>

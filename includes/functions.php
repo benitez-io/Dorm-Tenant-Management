@@ -198,6 +198,7 @@ function status_badge_class(string $status): string
         'Overdue'     => 'danger',
         'Failed'      => 'danger',
         'Evicted'     => 'danger',
+        'Declined'    => 'danger',
         'Rejected'    => 'danger',
         'Expired'     => 'danger',
         'Terminated'  => 'danger',

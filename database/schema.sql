@@ -71,8 +71,11 @@ CREATE TABLE tenants (
                     NOT NULL DEFAULT 'Pending',
   tenant_type       ENUM('Student','Employee') NOT NULL DEFAULT 'Student',
   key_returned      BOOLEAN NOT NULL DEFAULT FALSE,
-  approval_status   ENUM('Pending','Approved','Rejected')
+  approval_status   ENUM('Pending','Approved','Declined','Rejected')
                     NOT NULL DEFAULT 'Pending',
+  contact_number    VARCHAR(20) DEFAULT NULL,
+  emergency_contact_name VARCHAR(100) DEFAULT NULL,
+  emergency_contact_phone VARCHAR(20) DEFAULT NULL,
   rejection_reason  TEXT DEFAULT NULL,
   emergency_contact VARCHAR(100),
   emergency_phone   VARCHAR(20),
