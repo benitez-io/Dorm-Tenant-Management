@@ -9,7 +9,7 @@
  */
 
 declare(strict_types=1);
-
+date_default_timezone_set('Asia/Manila');
 error_reporting(E_ALL);
 ini_set('display_errors', '1'); // set to '0' before showing this to anyone but yourself
 

@@ -19,8 +19,19 @@
   --radius: 14px;
   --radius-sm: 9px;
   --radius-lg: 22px;
+  --radius-pill: 50rem;
+  --radius-md: 12px;
   --shadow: 0 4px 16px rgba(15, 23, 42, 0.05), 0 1px 3px rgba(15, 23, 42, 0.03);
   --shadow-lg: 0 20px 50px rgba(40, 5, 10, .18);
+
+  --btn-maroon-primary: #700000;
+  --btn-maroon-hover: #540000;
+  --btn-maroon-active: #3e0000;
+  --btn-disabled-bg: #f1f5f9;
+  --btn-disabled-text: #94a3b8;
+  --btn-disabled-border: #e2e8f0;
+  --btn-transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --btn-focus-ring: 0 0 0 3px rgba(112, 0, 0, 0.2);
 
   /* soft-pill badge pairs: background / text */
   --blue-bg: #dbe7fb;   --blue-text: #2f5fc4;
@@ -28,6 +39,23 @@
   --amber-bg: #faf1c6;  --amber-text: #9a7a09;
   --red-bg: #fadadb;    --red-text: #c23b3f;
   --gray-bg: #e8e9ed;   --gray-text: #5b6270;
+}
+
+button,
+.btn {
+  font-family: inherit;
+  font-weight: 600;
+  transition: var(--btn-transition);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+button:focus-visible,
+.btn:focus-visible {
+  outline: none !important;
+  box-shadow: var(--btn-focus-ring) !important;
 }
 
 ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -655,31 +683,124 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.01em; }
   color: #ffffff;
 }
 
-/* Solid Maroon Button - Keeps white text and darkens maroon on hover */
-.btn-maroon { 
-  background: var(--maroon); 
-  border-color: var(--maroon); 
-  color: #ffffff; 
-  font-weight: 600; 
-  border-radius: var(--radius-sm); 
+.btn-primary-cta,
+.btn-maroon-active,
+.btn-maroon,
+.btn-maroon-solid {
+  background-color: var(--btn-maroon-primary) !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: var(--radius-pill) !important;
+  padding: 0.65rem 1.5rem !important;
+  font-size: 0.95rem;
+  box-shadow: 0 4px 12px rgba(112, 0, 0, 0.2);
+  cursor: pointer;
 }
-.btn-maroon:hover { 
-  background: var(--maroon-dark, #500000); 
-  border-color: var(--maroon-dark, #500000); 
-  color: #ffffff; 
+
+.btn-primary-cta:hover,
+.btn-maroon-active:hover,
+.btn-maroon:hover,
+.btn-maroon-solid:hover {
+  background-color: var(--btn-maroon-hover) !important;
+  color: #ffffff !important;
+  border: none !important;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(112, 0, 0, 0.3);
+}
+
+.btn-primary-cta:active,
+.btn-maroon-active:active,
+.btn-maroon:active,
+.btn-maroon-solid:active {
+  background-color: var(--btn-maroon-active) !important;
+  color: #ffffff !important;
+  transform: translateY(0);
+}
+
+.btn-primary-cta:disabled,
+.btn-primary-cta[disabled],
+.btn-reset-submit:disabled,
+.btn-reset-submit[disabled] {
+  background-color: var(--btn-disabled-bg) !important;
+  color: var(--btn-disabled-text) !important;
+  border: 1px solid var(--btn-disabled-border) !important;
+  box-shadow: none !important;
+  cursor: not-allowed !important;
+  transform: none !important;
+}
+
+.btn-autofill,
+.btn-badge-action {
+  background-color: var(--btn-maroon-primary) !important;
+  color: #ffffff !important;
+  border: none !important;
+  border-radius: var(--radius-pill) !important;
+  padding: 0.35rem 0.85rem !important;
+  font-size: 0.75rem !important;
+  cursor: pointer;
+}
+
+.btn-autofill:hover,
+.btn-badge-action:hover {
+  background-color: var(--btn-maroon-hover) !important;
+}
+
+.btn-autofill i,
+.btn-badge-action i {
+  font-size: 0.85rem;
+}
+
+.toggle-password {
+  background-color: transparent !important;
+  border: none !important;
+  color: #64748b !important;
+  padding: 0 0.85rem !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.toggle-password:hover {
+  color: var(--btn-maroon-primary) !important;
+}
+
+.btn-ghost {
+  background-color: transparent !important;
+  color: var(--btn-maroon-primary) !important;
+  border: 1px solid var(--btn-maroon-primary) !important;
+  border-radius: var(--radius-pill) !important;
+  padding: 0.5rem 1.25rem !important;
+}
+
+.btn-ghost:hover {
+  background-color: rgba(112, 0, 0, 0.05) !important;
+}
+
+/* Solid Maroon Button - Keeps white text and darkens maroon on hover */
+.btn-maroon {
+  background: var(--maroon);
+  border-color: var(--maroon);
+  color: #ffffff;
+  font-weight: 600;
+  border-radius: var(--radius-pill);
+}
+.btn-maroon:hover {
+  background: var(--maroon-dark, #500000);
+  border-color: var(--maroon-dark, #500000);
+  color: #ffffff;
 }
 
 /* Outline Maroon Button - Solidifies to Maroon background with white text on hover */
-.btn-outline-maroon { 
-  border: 1px solid var(--maroon); 
-  color: var(--maroon); 
-  font-weight: 600; 
-  background: transparent; 
-  border-radius: var(--radius-sm); 
+.btn-outline-maroon {
+  border: 1px solid var(--maroon);
+  color: var(--maroon);
+  font-weight: 600;
+  background: transparent;
+  border-radius: var(--radius-pill);
 }
-.btn-outline-maroon:hover { 
-  background: var(--maroon); 
-  color: #ffffff; 
+.btn-outline-maroon:hover {
+  background: var(--maroon);
+  color: #ffffff;
 }
 
 /* Icon Button */
@@ -832,6 +953,7 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.01em; }
 .strength-meter-container { margin-top: .25rem; }
 .password-strength-meter { display: grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap: .38rem; }
 .strength-bars .bar { height: 6px; border-radius: 3px; background-color: #e0e0e0; transition: background-color .3s ease; }
+.strength-bar,
 .strength-segment {
   height: 6px; border-radius: 999px; background-color: #e2e8f0; border: 1px solid rgba(148, 163, 184, 0.15);
   transition: background-color .25s ease, border-color .25s ease, opacity .25s ease, transform .25s ease;
@@ -888,11 +1010,56 @@ input[name="role"]:checked + .role-option-card .role-icon-box { background: #fdf
 .form-check-input:checked { background-color: #700000; border-color: #700000; box-shadow: 0 0 0 3px rgba(112,0,0,.15); }
 .form-check-input:focus { border-color: #700000; box-shadow: 0 0 0 3px rgba(112,0,0,.2); }
 .strength-segment { height: 4px; background-color: #e2e8f0; transition: background-color .3s ease; }
+.strength-segment.active-maroon { background-color: #700000 !important; }
 .strength-segment.active-weak { background-color: #ff4d4d; }
 .strength-segment.active-fair { background-color: #ffa500; }
 .strength-segment.active-medium { background-color: #ffcc00; }
 .strength-segment.active-strong { background-color: #2ed573; }
 .strength-segment.active-very-strong { background-color: #1e90ff; }
+
+.strength-label-text {
+  font-size: 0.725rem !important;
+  font-weight: 700;
+  color: #700000 !important;
+}
+
+.requirements-met-text {
+  font-size: 0.7rem !important;
+  color: #64748b;
+}
+
+.req-item {
+  color: #64748b;
+  font-size: 0.725rem;
+  transition: color 0.2s ease;
+}
+
+.req-item.passed {
+  color: #700000 !important;
+  font-weight: 600;
+}
+
+.req-item.passed .req-icon {
+  color: #700000 !important;
+}
+
+.status-dot-item .dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: #cbd5e1;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.status-dot-item.active-maroon {
+  color: #700000 !important;
+  font-weight: 600;
+}
+
+.status-dot-item.active-maroon .dot {
+  background-color: #700000 !important;
+}
 
 /* ---------- Password recovery wizard ---------- */
 .recovery-back { display: inline-flex; align-items: center; gap: .4rem; font-size: .85rem; font-weight: 600; color: var(--text-muted); margin-bottom: 1.1rem; }
@@ -1470,25 +1637,26 @@ input[name="role"]:checked + .role-option-card .role-icon-box { background: #fdf
   flex-shrink: 0;
 }
 
-.status-dot-item.active-green {
-  color: #16a34a !important;
+.status-dot-item.active-maroon {
+  color: #700000 !important;
   font-weight: 600;
 }
 
-.status-dot-item.active-green .dot {
-  background-color: #16a34a !important;
+.status-dot-item.active-maroon .dot {
+  background-color: #700000 !important;
 }
 
 .btn-reset-submit {
-  background-color: #f1f5f9 !important;
-  color: #94a3b8 !important;
-  border: 1px solid #e2e8f0 !important;
+  background-color: var(--btn-disabled-bg) !important;
+  color: var(--btn-disabled-text) !important;
+  border: 1px solid var(--btn-disabled-border) !important;
+  border-radius: var(--radius-pill) !important;
   cursor: not-allowed !important;
-  transition: all 0.25s ease-in-out;
+  transition: var(--btn-transition);
 }
 
 .btn-reset-submit.btn-maroon-active {
-  background-color: #700000 !important;
+  background-color: var(--btn-maroon-primary) !important;
   color: #ffffff !important;
   border: none !important;
   cursor: pointer !important;
@@ -1496,7 +1664,7 @@ input[name="role"]:checked + .role-option-card .role-icon-box { background: #fdf
 }
 
 .btn-reset-submit.btn-maroon-active:hover {
-  background-color: #540000 !important;
+  background-color: var(--btn-maroon-hover) !important;
   transform: translateY(-1px);
 }
 

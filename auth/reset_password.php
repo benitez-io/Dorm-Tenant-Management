@@ -81,7 +81,7 @@ include __DIR__ . '/../includes/header.php';
             <i class="bi bi-shield-check"></i>
             <div>For your security, you'll be signed out of any other active session the next time it loads a page.</div>
           </div>
-          <a href="<?= BASE_URL ?>/auth/login.php" class="btn btn-maroon w-100">Return to Login</a>
+          <a href="<?= BASE_URL ?>/auth/login.php" class="btn btn-primary-cta w-100 py-2.5">Return to Login</a>
         </div>
       <?php else: ?>
         <a href="<?= BASE_URL ?>/auth/forgot_password.php" class="recovery-back"><i class="bi bi-arrow-left"></i> Back</a>
@@ -184,12 +184,12 @@ include __DIR__ . '/../includes/header.php';
           </div>
 
           <div class="status-indicators d-flex justify-content-center gap-4 mb-4 xxs-text">
-            <span class="status-dot-item d-flex align-items-center gap-2 active-green" id="dot-otp"><span class="dot"></span><span>OTP Complete</span></span>
+            <span class="status-dot-item d-flex align-items-center gap-2 active-maroon" id="dot-otp"><span class="dot"></span><span>OTP Complete</span></span>
             <span class="status-dot-item d-flex align-items-center gap-2 text-muted" id="dot-valid"><span class="dot"></span><span>Password Valid</span></span>
             <span class="status-dot-item d-flex align-items-center gap-2 text-muted" id="dot-match"><span class="dot"></span><span>Passwords Match</span></span>
           </div>
 
-          <button type="submit" id="resetSubmitBtn" class="btn btn-reset-submit w-100 py-2.5 rounded-pill fw-bold d-flex align-items-center justify-content-center gap-2" disabled>
+          <button type="submit" id="resetSubmitBtn" class="btn btn-reset-submit btn-primary-cta w-100 py-2.5 rounded-pill fw-bold d-flex align-items-center justify-content-center gap-2" disabled>
             <i class="bi bi-shield-check"></i>
             <span>Reset Password &amp; Log In</span>
           </button>
@@ -239,7 +239,7 @@ $extraScripts = <<<'HTML'
     const otpDone = otpHidden ? otpHidden.value.length === 6 : false;
     const otpDot = document.getElementById('dot-otp');
     if (otpDot) {
-      otpDot.classList.toggle('active-green', otpDone);
+      otpDot.classList.toggle('active-maroon', otpDone);
       otpDot.classList.toggle('text-muted', !otpDone);
     }
 
@@ -503,7 +503,8 @@ $extraScripts = <<<'HTML'
 
       segments.forEach((seg, idx) => {
         if (!seg) return;
-        seg.style.backgroundColor = idx < passedCount ? (passedCount === 5 ? '#700000' : '#f59e0b') : '#e2e8f0';
+        seg.style.backgroundColor = idx < passedCount ? '#700000' : '#e2e8f0';
+        seg.classList.toggle('active-maroon', idx < passedCount);
       });
 
       const isPasswordValid = passedCount === 5;
@@ -511,18 +512,18 @@ $extraScripts = <<<'HTML'
       const otpDone = otpHidden ? otpHidden.value.length === 6 : true;
 
       if (isPasswordValid) {
-        dotValid.classList.add('active-green');
+        dotValid.classList.add('active-maroon');
         dotValid.classList.remove('text-muted');
       } else {
-        dotValid.classList.remove('active-green');
+        dotValid.classList.remove('active-maroon');
         dotValid.classList.add('text-muted');
       }
 
       if (isMatch) {
-        dotMatch.classList.add('active-green');
+        dotMatch.classList.add('active-maroon');
         dotMatch.classList.remove('text-muted');
       } else {
-        dotMatch.classList.remove('active-green');
+        dotMatch.classList.remove('active-maroon');
         dotMatch.classList.add('text-muted');
       }
 

@@ -160,32 +160,50 @@ function time_ago(?string $datetime): string
         return 'Just now';
     }
 
-    $timestamp = strtotime($datetime);
-    if ($timestamp === false) {
+    try {
+        $now = new DateTimeImmutable('now', new DateTimeZone('Asia/Manila'));
+        $date = new DateTimeImmutable($datetime, new DateTimeZone('Asia/Manila'));
+    } catch (Exception $e) {
         return 'Just now';
     }
 
-    $diff = time() - $timestamp;
-    if ($diff < 60) {
+    $seconds = $now->getTimestamp() - $date->getTimestamp();
+
+    if ($seconds <= 0) {
         return 'Just now';
     }
 
-    $mins = (int) floor($diff / 60);
-    if ($mins < 60) {
-        return $mins . ' mins ago';
+    if ($seconds < 60) {
+        return 'Just now';
     }
 
-    $hours = (int) floor($mins / 60);
+    $minutes = (int) floor($seconds / 60);
+    if ($minutes < 60) {
+        return $minutes . ' min' . ($minutes === 1 ? '' : 's') . ' ago';
+    }
+
+    $hours = (int) floor($seconds / 3600);
     if ($hours < 24) {
         return $hours . ' hour' . ($hours === 1 ? '' : 's') . ' ago';
     }
 
-    $days = (int) floor($hours / 24);
-    if ($days < 2) {
-        return date('g:i A', $timestamp);
+    $days = (int) floor($seconds / 86400);
+    if ($days < 7) {
+        return $days . ' day' . ($days === 1 ? '' : 's') . ' ago';
     }
 
-    return date('M j, g:i A', $timestamp);
+    $weeks = (int) floor($days / 7);
+    if ($weeks < 5) {
+        return $weeks . ' week' . ($weeks === 1 ? '' : 's') . ' ago';
+    }
+
+    $months = (int) floor($days / 30);
+    if ($months < 12) {
+        return $months . ' month' . ($months === 1 ? '' : 's') . ' ago';
+    }
+
+    $years = (int) floor($days / 365);
+    return $years . ' year' . ($years === 1 ? '' : 's') . ' ago';
 }
 
 // issue_title is picked from a fixed dropdown of trade-like values

@@ -18,15 +18,5 @@
       }, false);
     });
 
-    // ---- Password confirmation must match, everywhere both fields exist
-    const pw = document.getElementById('regPassword') || document.getElementById('userPassword') || document.getElementById('password');
-    const confirm = document.getElementById('regConfirmPassword') || document.getElementById('userConfirmPassword') || document.getElementById('confirm_password');
-    if (pw && confirm) {
-      const checkMatch = function () {
-        confirm.setCustomValidity(confirm.value !== pw.value ? 'Passwords do not match.' : '');
-      };
-      pw.addEventListener('input', checkMatch);
-      confirm.addEventListener('input', checkMatch);
-    }
   });
 })();

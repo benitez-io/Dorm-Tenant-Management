@@ -17,8 +17,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $old['contact_number'] = str_input($_POST, 'contact_number');
     $old['age']        = str_input($_POST, 'age');
     $old['tenant_type'] = in_array($_POST['tenant_type'] ?? '', ['Student', 'Employee'], true) ? $_POST['tenant_type'] : 'Student';
-    $password          = str_input($_POST, 'password', '', false);
-    $confirm           = $_POST['confirm_password'] ?? '';
+    $password = str_input($_POST, 'password', '', false);
+    $confirmPassword = str_input($_POST, 'confirm_password', '', false);
     $old['emergency_contact_name'] = str_input($_POST, 'emergency_contact_name');
     $old['emergency_contact_phone'] = str_input($_POST, 'emergency_contact_phone');
     $cleanContactNumber = preg_replace('/\D+/', '', $old['contact_number']);
@@ -31,9 +31,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'Please enter a valid email address.';
     }
     if (($passwordError = password_policy_error($password)) !== null) {
-      $errors[] = $passwordError;
+        $errors[] = $passwordError;
     }
-    if ($password !== $confirm) {
+    if ($password !== $confirmPassword) {
         $errors[] = 'Passwords do not match.';
     }
     if ($old['contact_number'] === '' || !preg_match('/^[0-9+() .-]{7,20}$/', $old['contact_number']) || strlen($cleanContactNumber) < 7) {
@@ -169,32 +169,31 @@ include __DIR__ . '/../includes/header.php';
             <label class="form-label">Password <span class="text-danger">*</span></label>
             <div class="input-field-wrapper position-relative">
               <i class="bi bi-lock field-icon-left"></i>
-              <input type="password" name="password" id="regPassword" class="form-control custom-input px-5 js-password-strength" data-strength-for="regPassword" value="" autocomplete="new-password" minlength="8" placeholder="Enter a strong password" required>
-              <button type="button" class="btn-toggle-eye js-toggle-pwd" data-target="regPassword" aria-label="Toggle password visibility"><i class="bi bi-eye"></i></button>
+              <input type="password" name="password" id="password" class="form-control custom-input px-5 js-password-strength" data-strength-for="password" value="" autocomplete="new-password" minlength="8" placeholder="Enter a strong password" required>
+              <button type="button" class="btn-toggle-eye js-toggle-pwd" data-target="password" aria-label="Toggle password visibility"><i class="bi bi-eye"></i></button>
             </div>
           </div>
           <div class="col-md-6">
             <label class="form-label">Confirm Password <span class="text-danger">*</span></label>
             <div class="input-field-wrapper position-relative">
               <i class="bi bi-lock field-icon-left"></i>
-              <input type="password" name="confirm_password" id="regConfirmPassword" class="form-control custom-input px-5" value="" autocomplete="new-password" minlength="8" placeholder="Re-enter your password" required>
-              <button type="button" class="btn-toggle-eye js-toggle-pwd" data-target="regConfirmPassword" aria-label="Toggle password visibility"><i class="bi bi-eye"></i></button>
+              <input type="password" name="confirm_password" id="confirm_password" class="form-control custom-input px-5" value="" autocomplete="new-password" minlength="8" placeholder="Re-enter your password" required>
+              <button type="button" class="btn-toggle-eye js-toggle-pwd" data-target="confirm_password" aria-label="Toggle password visibility"><i class="bi bi-eye"></i></button>
             </div>
           </div>
         </div>
-        <div class="strength-meter-container mt-2 mb-2" data-strength-for="regPassword">
-          <div class="password-strength-meter d-flex gap-1"><div class="strength-segment flex-fill rounded-pill"></div><div class="strength-segment flex-fill rounded-pill"></div><div class="strength-segment flex-fill rounded-pill"></div><div class="strength-segment flex-fill rounded-pill"></div><div class="strength-segment flex-fill rounded-pill"></div></div>
-          <div class="d-flex justify-content-between align-items-center mt-1"><span class="strength-label small fw-bold text-danger">Very Weak</span><span class="strength-count small text-muted">0/5 requirements met</span></div>
-        </div>
-        <div class="password-requirements-box mb-3">
-          <p class="password-rule-hint mb-2">Must be ≥8 characters, contain uppercase, lowercase, a number, and a special character (e.g., Hrm@2026!).</p>
-          <ul class="password-checklist mb-0">
-            <li class="pass-check-item" data-requirement="length"><span class="checkmark"><i class="bi bi-x-lg"></i></span><span>At least 8 characters</span></li>
-            <li class="pass-check-item" data-requirement="uppercase"><span class="checkmark"><i class="bi bi-x-lg"></i></span><span>Uppercase letter (A–Z)</span></li>
-            <li class="pass-check-item" data-requirement="lowercase"><span class="checkmark"><i class="bi bi-x-lg"></i></span><span>Lowercase letter (a–z)</span></li>
-            <li class="pass-check-item" data-requirement="number"><span class="checkmark"><i class="bi bi-x-lg"></i></span><span>Number (0–9)</span></li>
-            <li class="pass-check-item" data-requirement="special"><span class="checkmark"><i class="bi bi-x-lg"></i></span><span>Special character (@!#...)</span></li>
-          </ul>
+        <div class="strength-meter-container mt-2 mb-2" data-strength-for="password">
+          <div class="password-strength-meter d-flex gap-1">
+            <div class="strength-bar strength-segment flex-fill rounded-pill"></div>
+            <div class="strength-bar strength-segment flex-fill rounded-pill"></div>
+            <div class="strength-bar strength-segment flex-fill rounded-pill"></div>
+            <div class="strength-bar strength-segment flex-fill rounded-pill"></div>
+            <div class="strength-bar strength-segment flex-fill rounded-pill"></div>
+          </div>
+          <div class="d-flex justify-content-between align-items-center mt-1">
+            <span id="strength-label" class="strength-label strength-label-text fw-bold">Very Weak</span>
+            <span id="requirements-counter" class="strength-count requirements-met-text">0/5 requirements met</span>
+          </div>
         </div>
         <hr class="my-3">
         <p class="text-muted small mb-2">Emergency contact (optional, but recommended)</p>
@@ -209,10 +208,59 @@ include __DIR__ . '/../includes/header.php';
           </div>
         </div>
         <div class="policy-notice-box p-3 rounded-4 border d-flex align-items-start gap-2 my-3"><i class="bi bi-info-circle text-muted fs-5 flex-shrink-0 mt-1"></i><p class="text-secondary xs-text mb-0">By creating an account, you agree to the dorm management policies and confirm that the information provided is accurate.</p></div>
-        <button type="submit" class="btn btn-maroon w-100 py-3 rounded-pill fw-bold text-white d-flex align-items-center justify-content-center gap-2 shadow-sm"><i class="bi bi-person-check fs-5"></i><span>Create Account</span><i class="bi bi-arrow-up-right fs-6 link-arrow-icon"></i></button>
+        <button type="submit" class="btn btn-primary-cta w-100 py-2.5 rounded-pill fw-bold text-white d-flex align-items-center justify-content-center gap-2 shadow-sm"><i class="bi bi-person-check fs-5"></i><span>Create Account</span><i class="bi bi-arrow-up-right fs-6 link-arrow-icon"></i></button>
       </form>
     </div>
   </div>
   <footer class="auth-global-footer text-center"><p class="xxs-text text-white-50 mb-0">&copy; 2026 Teen T-ITans &middot; Dorm Tenant Management System</p></footer>
 </div>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const passwordInput = document.getElementById('password') || document.querySelector('input[name="password"]');
+  const bars = document.querySelectorAll('.strength-bar');
+  const strengthText = document.getElementById('strength-label');
+  const counterText = document.getElementById('requirements-counter');
+
+  if (passwordInput) {
+    passwordInput.addEventListener('input', (e) => {
+      const val = e.target.value;
+
+      const hasLength = val.length >= 8;
+      const hasUpper = /[A-Z]/.test(val);
+      const hasLower = /[a-z]/.test(val);
+      const hasNumber = /[0-9]/.test(val);
+      const hasSpecial = /[^A-Za-z0-9]/.test(val);
+
+      const score = [hasLength, hasUpper, hasLower, hasNumber, hasSpecial].filter(Boolean).length;
+
+      const levels = [
+        { label: 'Very Weak', color: '#ef4444' },
+        { label: 'Weak', color: '#f97316' },
+        { label: 'Fair', color: '#eab308' },
+        { label: 'Good', color: '#700000' },
+        { label: 'Very Strong', color: '#700000' }
+      ];
+
+      if (strengthText) {
+        strengthText.textContent = val.length === 0 ? 'Very Weak' : levels[score - 1]?.label || 'Very Weak';
+        strengthText.style.color = val.length === 0 ? '#ef4444' : levels[score - 1]?.color || '#700000';
+      }
+
+      if (counterText) {
+        counterText.textContent = `${score}/5 requirements met`;
+      }
+
+      bars.forEach((bar, index) => {
+        if (index < score) {
+          bar.style.backgroundColor = levels[score - 1]?.color || '#700000';
+          bar.classList.add('active-maroon');
+        } else {
+          bar.style.backgroundColor = '#e2e8f0';
+          bar.classList.remove('active-maroon');
+        }
+      });
+    });
+  }
+});
+</script>
 <?php include __DIR__ . '/../includes/footer.php'; ?>

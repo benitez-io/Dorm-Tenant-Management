@@ -72,19 +72,21 @@ render_module_tabs([
         <div class="mb-3 mt-3"><label class="form-label">Email Address <span class="text-danger">*</span></label><input type="email" class="form-control" name="email" placeholder="user@email.com" required></div>
         <div class="mb-3"><label class="form-label">Phone Number <span class="text-danger">*</span></label><input type="tel" class="form-control" name="contact_number" id="adminPhoneNumber" pattern="[0-9+() .-]{7,20}" placeholder="+63 XXX XXX XXXX" required></div>
         <div class="row g-2 mb-3">
-          <div class="col-md-6"><label class="form-label">Password <span class="text-danger">*</span></label><div class="input-field-wrapper position-relative"><i class="bi bi-lock field-icon-left"></i><input type="password" id="userPassword" name="password" class="form-control custom-input px-5 js-password-strength" data-strength-for="userPassword" placeholder="Enter a strong password" autocomplete="new-password" minlength="8" required><button type="button" class="btn-toggle-eye js-toggle-pwd" data-target="userPassword" aria-label="Toggle password visibility"><i class="bi bi-eye"></i></button></div></div>
-          <div class="col-md-6"><label class="form-label">Confirm Password <span class="text-danger">*</span></label><div class="input-field-wrapper position-relative"><i class="bi bi-lock field-icon-left"></i><input type="password" id="userConfirmPassword" name="confirm_password" class="form-control custom-input px-5" placeholder="Re-enter your password" autocomplete="new-password" minlength="8" required><button type="button" class="btn-toggle-eye js-toggle-pwd" data-target="userConfirmPassword" aria-label="Toggle password visibility"><i class="bi bi-eye"></i></button></div></div>
+          <div class="col-md-6"><label class="form-label">Password <span class="text-danger">*</span></label><div class="input-field-wrapper position-relative"><i class="bi bi-lock field-icon-left"></i><input type="password" id="password" name="password" class="form-control custom-input px-5 js-password-strength" data-strength-for="password" placeholder="Enter a strong password" autocomplete="new-password" minlength="8" required><button type="button" class="btn-toggle-eye js-toggle-pwd" data-target="password" aria-label="Toggle password visibility"><i class="bi bi-eye"></i></button></div></div>
+          <div class="col-md-6"><label class="form-label">Confirm Password <span class="text-danger">*</span></label><div class="input-field-wrapper position-relative"><i class="bi bi-lock field-icon-left"></i><input type="password" id="confirm_password" name="confirm_password" class="form-control custom-input px-5" placeholder="Re-enter your password" autocomplete="new-password" minlength="8" required><button type="button" class="btn-toggle-eye js-toggle-pwd" data-target="confirm_password" aria-label="Toggle password visibility"><i class="bi bi-eye"></i></button></div></div>
         </div>
-        <div class="strength-meter-container mb-2" data-strength-for="userPassword"><div class="password-strength-meter d-flex gap-1"><div class="strength-segment flex-fill rounded-pill"></div><div class="strength-segment flex-fill rounded-pill"></div><div class="strength-segment flex-fill rounded-pill"></div><div class="strength-segment flex-fill rounded-pill"></div><div class="strength-segment flex-fill rounded-pill"></div></div><div class="d-flex justify-content-between mt-1"><span class="strength-label small fw-bold text-danger">Very Weak</span><span class="strength-count small text-muted">0/5 requirements met</span></div></div>
-        <div class="password-requirements-box mb-3">
-          <p class="password-rule-hint mb-2">Must be ≥8 characters, contain uppercase, lowercase, a number, and a special character (e.g., Hrm@2026!).</p>
-          <ul class="password-checklist mb-0">
-            <li class="pass-check-item" data-requirement="length"><span class="checkmark"><i class="bi bi-x-lg"></i></span><span>At least 8 characters</span></li>
-            <li class="pass-check-item" data-requirement="uppercase"><span class="checkmark"><i class="bi bi-x-lg"></i></span><span>Uppercase letter (A–Z)</span></li>
-            <li class="pass-check-item" data-requirement="lowercase"><span class="checkmark"><i class="bi bi-x-lg"></i></span><span>Lowercase letter (a–z)</span></li>
-            <li class="pass-check-item" data-requirement="number"><span class="checkmark"><i class="bi bi-x-lg"></i></span><span>Number (0–9)</span></li>
-            <li class="pass-check-item" data-requirement="special"><span class="checkmark"><i class="bi bi-x-lg"></i></span><span>Special character (@!#...)</span></li>
-          </ul>
+        <div class="strength-meter-container mb-2" data-strength-for="password">
+          <div class="password-strength-meter d-flex gap-1">
+            <div class="strength-bar strength-segment flex-fill rounded-pill"></div>
+            <div class="strength-bar strength-segment flex-fill rounded-pill"></div>
+            <div class="strength-bar strength-segment flex-fill rounded-pill"></div>
+            <div class="strength-bar strength-segment flex-fill rounded-pill"></div>
+            <div class="strength-bar strength-segment flex-fill rounded-pill"></div>
+          </div>
+          <div class="d-flex justify-content-between mt-1">
+            <span id="strength-label" class="strength-label small fw-bold text-danger">Very Weak</span>
+            <span id="requirements-counter" class="strength-count small text-muted">0/5 requirements met</span>
+          </div>
         </div>
         <div class="mb-3"><label class="form-label">User Category</label><select name="category" class="form-select"><option value="" disabled selected>Select category...</option><option value="student">Student / Resident</option><option value="staff">Administrative Staff</option></select></div>
         <div class="mb-3"><label class="form-label">Emergency Contact Name</label><input class="form-control" name="emergency_contact_name" placeholder="Full name"></div>
@@ -103,6 +105,58 @@ render_module_tabs([
     </div>
   </form>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const passwordInput = document.getElementById('password') || document.querySelector('input[name="password"]');
+  const bars = document.querySelectorAll('.strength-bar');
+  const strengthText = document.getElementById('strength-label');
+  const counterText = document.getElementById('requirements-counter');
+
+  if (passwordInput) {
+    const updateStrength = (value) => {
+      const hasLength = value.length >= 8;
+      const hasUpper = /[A-Z]/.test(value);
+      const hasLower = /[a-z]/.test(value);
+      const hasNumber = /[0-9]/.test(value);
+      const hasSpecial = /[^A-Za-z0-9]/.test(value);
+
+      const score = [hasLength, hasUpper, hasLower, hasNumber, hasSpecial].filter(Boolean).length;
+
+      const levels = [
+        { label: 'Very Weak', color: '#ef4444' },
+        { label: 'Weak', color: '#f97316' },
+        { label: 'Fair', color: '#eab308' },
+        { label: 'Good', color: '#3b82f6' },
+        { label: 'Very Strong', color: '#10b981' }
+      ];
+
+      if (strengthText) {
+        strengthText.textContent = value.length === 0 ? 'Very Weak' : levels[score - 1]?.label || 'Very Weak';
+        strengthText.style.color = value.length === 0 ? '#ef4444' : levels[score - 1]?.color || '#ef4444';
+      }
+
+      if (counterText) {
+        counterText.textContent = `${score}/5 requirements met`;
+      }
+
+      bars.forEach((bar, index) => {
+        if (index < score) {
+          bar.style.backgroundColor = levels[score - 1]?.color || '#10b981';
+        } else {
+          bar.style.backgroundColor = '#e2e8f0';
+        }
+      });
+    };
+
+    passwordInput.addEventListener('input', (e) => {
+      updateStrength(e.target.value);
+    });
+
+    updateStrength(passwordInput.value);
+  }
+});
+</script>
 
 <?php
 include __DIR__ . '/../includes/footer.php';

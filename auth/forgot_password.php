@@ -82,7 +82,7 @@ include __DIR__ . '/../includes/header.php';
           <i class="bi bi-check-circle-fill"></i>
           <div>Verification code sent. It expires in 15 minutes.</div>
         </div>
-        <a href="<?= BASE_URL ?>/auth/reset_password.php?email=<?= urlencode($oldEmail) ?>" class="btn btn-maroon-solid w-100 rounded-pill fw-bold">Enter Verification Code</a>
+        <a href="<?= BASE_URL ?>/auth/reset_password.php?email=<?= urlencode($oldEmail) ?>" class="btn btn-primary-cta w-100 py-2.5 rounded-pill fw-bold">Enter Verification Code</a>
       <?php else: ?>
         <div class="callout callout-info">
           <i class="bi bi-info-circle-fill"></i>
@@ -98,7 +98,7 @@ include __DIR__ . '/../includes/header.php';
               <input type="email" name="email" class="form-control" placeholder="Enter your email" value="<?= clean($oldEmail) ?>" required autofocus>
             </div>
           </div>
-          <button type="submit" class="btn btn-maroon-solid w-100 rounded-pill fw-bold">Send Verification Code</button>
+          <button type="submit" class="btn btn-primary-cta w-100 py-2.5 rounded-pill fw-bold">Send Verification Code</button>
         </form>
 
         <div style="display: flex; justify-content: center; align-items: center; width: 100%; margin: 20px auto 0;">
