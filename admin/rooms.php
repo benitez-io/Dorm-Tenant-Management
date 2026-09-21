@@ -113,7 +113,7 @@ include __DIR__ . '/../includes/header.php';
 require_once __DIR__ . '/../includes/module_tabs.php';
 require_once __DIR__ . '/../includes/page_header.php';
 render_page_header(
-    'bi-building',
+    'bi-door-open-fill',
     'Property Management',
     'Manage dorm rooms, assign tenants, and monitor availability.',
     '<button type="button" class="btn btn-maroon" data-bs-toggle="modal" data-bs-target="#roomModal"><i class="bi bi-plus-lg"></i> Add Room</button>'

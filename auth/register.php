@@ -100,7 +100,7 @@ include __DIR__ . '/../includes/header.php';
     <div class="auth-panel-left auth-sidebar text-white p-4 d-flex flex-column justify-content-between position-relative overflow-hidden">
       <div class="sidebar-circle-accent"></div>
       <div class="position-relative z-1">
-        <div class="sidebar-icon-wrapper mb-4 d-flex align-items-center justify-content-center rounded-4"><i class="bi bi-mortarboard-fill fs-3 text-white"></i></div>
+        <div class="sidebar-icon-wrapper mb-4 d-flex align-items-center justify-content-center rounded-4"><i class="bi bi-person-plus-fill fs-3 text-white"></i></div>
         <h2 class="fw-bold fs-3 text-white mb-2">Dorm Tenant<br>Management System</h2>
         <p class="sidebar-description text-white-50 small mb-4">Create your account to access the Dorm Tenant Rental Management System.</p>
         <div class="d-flex flex-column gap-3 mt-4">
@@ -191,8 +191,8 @@ include __DIR__ . '/../includes/header.php';
             <div class="strength-bar strength-segment flex-fill rounded-pill"></div>
           </div>
           <div class="d-flex justify-content-between align-items-center mt-1">
-            <span id="strength-label" class="strength-label strength-label-text fw-bold">Very Weak</span>
-            <span id="requirements-counter" class="strength-count requirements-met-text">0/5 requirements met</span>
+            <span id="strength-label" class="strength-label strength-label-text fw-bold" aria-live="polite"></span>
+            <span id="requirements-counter" class="strength-count requirements-met-text" aria-live="polite">0/5 requirements met</span>
           </div>
         </div>
         <hr class="my-3">
@@ -242,15 +242,21 @@ document.addEventListener('DOMContentLoaded', () => {
       ];
 
       if (strengthText) {
-        strengthText.textContent = val.length === 0 ? 'Very Weak' : levels[score - 1]?.label || 'Very Weak';
-        strengthText.style.color = val.length === 0 ? '#ef4444' : levels[score - 1]?.color || '#700000';
+        strengthText.textContent = val.length === 0 ? '' : levels[score - 1]?.label || 'Very Weak';
+        strengthText.style.color = val.length === 0 ? '' : levels[score - 1]?.color || '#700000';
       }
 
       if (counterText) {
-        counterText.textContent = `${score}/5 requirements met`;
+        counterText.textContent = val.length === 0 ? '0/5 requirements met' : `${score}/5 requirements met`;
       }
 
       bars.forEach((bar, index) => {
+        if (val.length === 0) {
+          bar.style.backgroundColor = '#e2e8f0';
+          bar.classList.remove('active-maroon');
+          return;
+        }
+
         if (index < score) {
           bar.style.backgroundColor = levels[score - 1]?.color || '#700000';
           bar.classList.add('active-maroon');

@@ -16,13 +16,13 @@ $here = $_SERVER['REQUEST_URI'] ?? '';
 
 // [icon, module label, default page, related pages]
 $adminLinks = [
-  ['<i class="bi bi-person-fill"></i>', 'User Management', '/admin/users.php', ['/admin/users.php', '/admin/credentials.php', '/admin/manage-tenants.php']],
+  ['<i class="bi bi-person-gear"></i>', 'User Management', '/admin/users.php', ['/admin/users.php', '/admin/credentials.php', '/admin/manage-tenants.php']],
   ['<i class="bi bi-people-fill"></i>', 'Tenant Management', '/admin/tenants.php', ['/admin/tenants.php', '/admin/tenant-status.php', '/admin/checkinout.php']],
-  ['<i class="bi bi-building"></i>', 'Property Management', '/admin/rooms.php', ['/admin/rooms.php']],
-  ['<i class="bi bi-credit-card-fill"></i>', 'Payments & Contracts', '/admin/payments.php', ['/admin/payments.php']],
+  ['<i class="bi bi-door-open-fill"></i>', 'Property Management', '/admin/rooms.php', ['/admin/rooms.php']],
+  ['<i class="bi bi-wallet2"></i>', 'Payments & Contracts', '/admin/payments.php', ['/admin/payments.php']],
   ['<i class="bi bi-tools"></i>', 'Maintenance', '/admin/maintenance.php', ['/admin/maintenance.php']],
   ['<i class="bi bi-bell-fill"></i>', 'Notifications', '/admin/notifications.php', ['/admin/notifications.php']],
-  ['<i class="bi bi-graph-up-arrow"></i>', 'Reports & Analytics', '/admin/reports.php', ['/admin/reports.php']],
+  ['<i class="bi bi-bar-chart-line-fill"></i>', 'Reports & Analytics', '/admin/reports.php', ['/admin/reports.php']],
 ];
 
 $tenantLinks = [
@@ -56,7 +56,7 @@ $tenantLinks = [
   <div class="sidebar-links">
   <?php if ($role === 'admin'): ?>
     <div class="sidebar-section">Overview</div>
-    <a class="sidebar-link <?= active('/admin/dashboard.php') ?>" href="<?= BASE_URL ?>/admin/dashboard.php"><span class="nav-icon"><i class="bi bi-speedometer2"></i></span> Dashboard</a>
+    <a class="sidebar-link <?= active('/admin/dashboard.php') ?>" href="<?= BASE_URL ?>/admin/dashboard.php"><span class="nav-icon"><i class="bi bi-grid-1x2-fill"></i></span> Dashboard</a>
     <?php $sectionLabels = [0 => 'Management', 3 => 'Finance', 4 => 'Operations', 6 => 'Reports']; ?>
     <?php foreach ($adminLinks as $index => [$icon, $label, $page, $relatedPages]):
         $moduleActive = false;

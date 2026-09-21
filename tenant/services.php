@@ -124,7 +124,7 @@ include __DIR__ . '/../includes/header.php';
           </div>
         <?php elseif ($isExpired || $daysLeft <= 30): ?>
           <div class="mt-3 p-3 rounded-3" style="border:1px solid <?= $isExpired ? 'var(--red-text)' : 'var(--border)' ?>;">
-            <strong><?= $isExpired ? '⚠️ Contract Expired' : '⏰ Contract Expiring Soon' ?></strong>
+            <strong><i class="bi <?= $isExpired ? 'bi-exclamation-triangle-fill' : 'bi-calendar2-warning' ?> me-1" aria-hidden="true"></i><?= $isExpired ? 'Contract Expired' : 'Contract Expiring Soon' ?></strong>
             <p class="text-muted small mb-2">
               <?php if ($isExpired): ?>
                 Your contract ended on <?= clean(date('F j, Y', strtotime($contract['contract_end']))) ?>. Ask the office to continue it, or visit them to arrange moving out.

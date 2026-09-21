@@ -53,12 +53,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $recent = $db->query("SELECT * FROM notifications ORDER BY date_sent DESC LIMIT 15")->fetchAll();
 $tenantsForSelect = $db->query("SELECT t.tenant_id, u.first_name, u.last_name, u.phone FROM tenants t JOIN users u ON u.user_id=t.user_id WHERE t.status='Active' ORDER BY u.first_name")->fetchAll();
 
-$typeIcon = ['Announcement' => '<i class="bi bi-megaphone-fill"></i>', 'Payment Reminder' => '<i class="bi bi-credit-card-fill"></i>', 'Contract Expiry Alert' => '⏰'];
+$typeIcon = ['Announcement' => '<i class="bi bi-bell-fill"></i>', 'Payment Reminder' => '<i class="bi bi-wallet2"></i>', 'Contract Expiry Alert' => '<i class="bi bi-calendar2-warning"></i>'];
 $typeTint = ['Announcement' => '', 'Payment Reminder' => 'tint-amber', 'Contract Expiry Alert' => 'tint-blue'];
 $typeOptions = [
-    'Announcement'           => ['<i class="bi bi-megaphone-fill"></i>', 'Announcements', 'Send general updates and important notices to tenants'],
-    'Payment Reminder'       => ['<i class="bi bi-credit-card-fill"></i>', 'Payment Reminders', 'Remind tenants about upcoming or overdue payments'],
-    'Contract Expiry Alert'  => ['⏰', 'Expiry Alerts', 'Alert tenants about expiring contracts or documents'],
+    'Announcement'           => ['<i class="bi bi-bell-fill"></i>', 'Announcements', 'Send general updates and important notices to tenants'],
+    'Payment Reminder'       => ['<i class="bi bi-wallet2"></i>', 'Payment Reminders', 'Remind tenants about upcoming or overdue payments'],
+    'Contract Expiry Alert'  => ['<i class="bi bi-calendar2-warning"></i>', 'Expiry Alerts', 'Alert tenants about expiring contracts or documents'],
 ];
 
 $pageTitle = 'Notification Management';

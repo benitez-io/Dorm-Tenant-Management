@@ -331,7 +331,7 @@ include __DIR__ . '/../includes/header.php';
 require_once __DIR__ . '/../includes/module_tabs.php';
 require_once __DIR__ . '/../includes/page_header.php';
 render_page_header(
-    'bi-credit-card-fill',
+    'bi-wallet2',
     'Payments & Contracts',
     'Track payments, upload contracts, and monitor upcoming expirations.',
     $headerActions[$activeTab]
@@ -605,7 +605,7 @@ render_module_tabs([
             <div class="form-text">Leave this unticked if you're ending the lease only to replace it with a new contract.</div>
           </div>
         </div>
-        <div class="modal-footer"><button class="btn btn-light" data-bs-dismiss="modal" type="button">Cancel</button><button class="btn btn-danger"><i class="bi bi-x-octagon"></i> Terminate Contract</button></div>
+        <div class="modal-footer"><button class="btn btn-light" data-bs-dismiss="modal" type="button">Cancel</button><button class="btn btn-maroon-primary"><i class="bi bi-x-octagon"></i> Terminate Contract</button></div>
       </form>
     </div>
   </div>

@@ -1,0 +1,48 @@
+:root {
+  --app-primary: #800000;
+  --app-primary-hover: #5a0000;
+  --app-success: #10b981;
+  --app-text: #1e293b;
+  --app-muted: #64748b;
+  --app-bg: #f8fafc;
+  --app-border: #e2e8f0;
+  --app-radius: 10px;
+  --app-shadow: 0 2px 8px rgba(15, 23, 42, .04);
+  --app-button-transition: background-color .15s ease, border-color .15s ease, box-shadow .15s ease, transform .15s ease, color .15s ease;
+  --app-focus-ring: 0 0 0 3px rgba(128, 0, 0, .15);
+}
+
+body { background: var(--app-bg); color: var(--app-text); }
+* { box-sizing: border-box; }
+.card, .panel, .stat-card, .detail-card, .dashboard-card { border-color: var(--app-border); border-radius: var(--app-radius); box-shadow: var(--app-shadow); }
+
+.btn, .btn-print, .print-btn, .btn-review, .btn-export, .report-actions .btn, .report-card-actions .btn,
+.header-action-btn, .btn-top-right, .page-header-action > .btn {
+  box-sizing: border-box;
+  min-height: 42px;
+  border-radius: var(--app-radius) !important;
+  transition: var(--app-button-transition) !important;
+}
+.btn:hover:not(:disabled), .btn-print:hover, .print-btn:hover, .btn-review:hover, .btn-export:hover,
+.report-actions .btn:hover, .report-card-actions .btn:hover, .header-action-btn:hover, .btn-top-right:hover,
+.page-header-action > .btn:hover {
+  box-shadow: 0 6px 14px rgba(15, 23, 42, .12) !important;
+  transform: translateY(-2px) !important;
+}
+.btn:active:not(:disabled), .btn-print:active, .print-btn:active, .btn-review:active, .btn-export:active,
+.report-actions .btn:active, .report-card-actions .btn:active, .header-action-btn:active, .btn-top-right:active,
+.page-header-action > .btn:active { transform: translateY(-1px) !important; box-shadow: 0 3px 8px rgba(15, 23, 42, .1) !important; }
+.btn-maroon, .btn-maroon-primary { background: var(--app-primary) !important; border: 1px solid var(--app-primary) !important; color: #fff !important; font-weight: 600; }
+.btn-maroon:hover, .btn-maroon-primary:hover { background: var(--app-primary-hover) !important; border-color: var(--app-primary-hover) !important; }
+.btn-outline-maroon { background: transparent !important; border: 1px solid var(--app-primary) !important; color: var(--app-primary) !important; }
+.btn-outline-maroon:hover { background: var(--app-primary) !important; color: #fff !important; }
+.form-control, .form-select { border: 1px solid var(--app-border); border-radius: var(--app-radius); }
+.form-control:focus, .form-select:focus { border-color: var(--app-primary); box-shadow: var(--app-focus-ring); }
+.badge { border-radius: 50rem; }
+
+@media print {
+  .no-print, .print-btn, .btn-print, button, .sidebar, .mobile-topbar, .page-header-action, .filter-toolbar, .module-tabs { display: none !important; }
+  body, main, .app-content { background: #fff !important; color: #000 !important; margin: 0 !important; padding: 0 !important; }
+  .panel, .card, .table-responsive { border: 0 !important; box-shadow: none !important; }
+  .table { width: 100% !important; }
+}

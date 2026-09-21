@@ -32,7 +32,7 @@ require_once __DIR__ . '/../includes/module_tabs.php';
 require_once __DIR__ . '/../includes/page_header.php';
 render_page_header(
     'bi-people-fill',
-    'Tenant Management',
+    'Tenant Status',
     'Review applications, track tenant status, and manage check-in/check-out.',
     '<a href="' . BASE_URL . '/admin/users.php" class="btn btn-maroon"><i class="bi bi-plus-lg"></i> New Application</a>'
 );

@@ -116,7 +116,7 @@ include __DIR__ . '/../includes/header.php';
 $rentCardClass = ['Paid' => 'is-paid', 'Pending' => 'is-pending', 'Overdue' => 'is-due', 'Due' => 'is-due', 'None' => 'is-none'][$rent['state']];
 $rentPaid = $rent['state'] === 'Paid';
 ?>
-<div class="rent-status-card <?= $rentCardClass ?>">
+<div class="rent-status-card <?= $rentCardClass ?> mb-4">
   <div>
     <div class="rent-status-label"><?= $rentPaid ? 'Rent' : 'Rent Due' ?> · <?= clean($rent['month']) ?></div>
     <div class="rent-status-amount"><?= peso($rent['amount']) ?></div>
@@ -163,13 +163,30 @@ $rentPaid = $rent['state'] === 'Paid';
   <div class="alert alert-info mt-3">You're approved! A room hasn't been assigned to you yet — the admin office will notify you once it is.</div>
 <?php endif; ?>
 
-<div class="quick-actions mt-3">
-  <a href="<?= BASE_URL ?>/tenant/payments.php" class="quick-action-card">
-    <div class="quick-action-icon"><i class="bi bi-credit-card-fill"></i></div><div><strong>Pay Rent</strong><div class="text-muted small">Make a payment</div></div>
-  </a>
-  <a href="<?= BASE_URL ?>/tenant/maintenance.php" class="quick-action-card">
-    <div class="quick-action-icon"><i class="bi bi-tools"></i></div><div><strong>Request Repair</strong><div class="text-muted small">Report an issue</div></div>
-  </a>
+<div class="row g-3 mb-4">
+  <div class="col-md-6">
+    <a href="<?= BASE_URL ?>/tenant/services.php" class="card border-0 shadow-sm rounded-4 p-3 text-decoration-none hover-lift h-100 d-flex flex-row align-items-center gap-3">
+      <div class="dashboard-action-icon bg-maroon-subtle text-maroon rounded-3 d-flex align-items-center justify-content-center">
+        <i class="bi bi-door-open-fill fs-5"></i>
+      </div>
+      <div>
+        <h6 class="fw-bold text-dark mb-0">My Room &amp; Contract</h6>
+        <small class="text-muted">View contract terms &amp; room details</small>
+      </div>
+    </a>
+  </div>
+
+  <div class="col-md-6">
+    <a href="<?= BASE_URL ?>/tenant/maintenance.php" class="card border-0 shadow-sm rounded-4 p-3 text-decoration-none hover-lift h-100 d-flex flex-row align-items-center gap-3">
+      <div class="dashboard-action-icon bg-maroon-subtle text-maroon rounded-3 d-flex align-items-center justify-content-center">
+        <i class="bi bi-tools fs-5"></i>
+      </div>
+      <div>
+        <h6 class="fw-bold text-dark mb-0">Request Repair</h6>
+        <small class="text-muted">Report an issue or maintenance request</small>
+      </div>
+    </a>
+  </div>
 </div>
 
 <div class="row g-4 mt-1">

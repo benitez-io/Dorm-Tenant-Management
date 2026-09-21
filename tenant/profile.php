@@ -12,7 +12,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = str_input($_POST, 'email');
     $phone = str_input($_POST, 'phone');
     $emergencyContact = str_input($_POST, 'emergency_contact');
-    $emergencyRelation = str_input($_POST, 'emergency_relation');
     $emergencyPhone   = str_input($_POST, 'emergency_phone');
     $newPassword = str_input($_POST, 'new_password', '', false);
 
@@ -30,10 +29,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $db->prepare('UPDATE users SET first_name=?, last_name=?, email=?, phone=? WHERE user_id=?')
                    ->execute([$first, $last, $email, $phone ?: null, current_user_id()]);
             }
-            // Emergency contact "relationship" isn't its own column — folded into the name field, matching the prototype's display.
-            $contactValue = $emergencyContact . ($emergencyRelation ? " ($emergencyRelation)" : '');
             $db->prepare('UPDATE tenants SET emergency_contact=?, emergency_phone=? WHERE user_id=?')
-               ->execute([$contactValue ?: null, $emergencyPhone ?: null, current_user_id()]);
+               ->execute([$emergencyContact ?: null, $emergencyPhone ?: null, current_user_id()]);
 
             $db->commit();
             $_SESSION['first_name'] = $first;
@@ -52,63 +49,111 @@ $stmt = $db->prepare('SELECT u.*, t.tenant_id, t.emergency_contact, t.emergency_
 $stmt->execute([current_user_id()]);
 $profile = $stmt->fetch();
 
-// Split "Name (Relationship)" back out for the form
-$relation = '';
-$contactName = $profile['emergency_contact'] ?? '';
-if (preg_match('/^(.*)\s\((.+)\)$/', (string) $contactName, $m)) {
-    $contactName = $m[1];
-    $relation = $m[2];
-}
+$contactName = preg_replace('/\s*\([^)]*\)$/', '', (string) ($profile['emergency_contact'] ?? ''));
 
 $pageTitle = 'My Profile';
 include __DIR__ . '/../includes/header.php';
 ?>
 <div class="page-header"><div><h1>My Profile</h1></div></div>
 
-<div class="panel mb-3" style="max-width: 720px;">
-  <div class="profile-header">
-    <div class="user-avatar user-avatar-lg"><?= clean(strtoupper(substr($profile['first_name'], 0, 1))) ?></div>
-    <div>
-      <h2 class="mb-0"><?= clean($profile['first_name'] . ' ' . $profile['last_name']) ?></h2>
-      <span class="text-muted">Tenant · TEN-<?= str_pad((string) $profile['tenant_id'], 4, '0', STR_PAD_LEFT) ?></span>
+<div class="container-lg">
+  <div class="row justify-content-center">
+    <div class="col-lg-10">
+      <div class="card border-0 shadow-sm rounded-4 p-4 mb-4">
+        <div class="d-flex align-items-center justify-content-between gap-3">
+          <div class="d-flex align-items-center gap-3">
+            <div class="avatar-circle bg-maroon-subtle text-maroon fw-bold fs-4 d-flex align-items-center justify-content-center rounded-circle" style="width: 56px; height: 56px;">
+              <?= clean(strtoupper(substr($profile['first_name'], 0, 1))) ?>
+            </div>
+            <div>
+              <h2 class="mb-0"><?= clean($profile['first_name'] . ' ' . $profile['last_name']) ?></h2>
+              <span class="text-muted">Tenant · TEN-<?= str_pad((string) $profile['tenant_id'], 4, '0', STR_PAD_LEFT) ?></span>
+            </div>
+          </div>
+
+          <button type="button" id="toggleEditBtn" class="btn btn-outline-maroon btn-sm px-3 py-1.5 rounded-pill fs-7 fw-semibold d-inline-flex align-items-center gap-1.5">
+            <i class="bi bi-pencil-square"></i>
+            <span>Edit Profile</span>
+          </button>
+        </div>
+      </div>
+
+      <form id="profileForm" method="post" class="mx-auto" style="max-width: 960px;">
+        <?= csrf_field() ?>
+        <div class="split-form">
+          <div class="panel">
+            <p class="fw-semibold small mb-3">Personal Information</p>
+            <div class="mb-3"><label class="form-label">First Name</label><input class="form-control bg-light border-0 edit-field" name="first_name" value="<?= clean($profile['first_name']) ?>" readonly required></div>
+            <div class="mb-3"><label class="form-label">Last Name</label><input class="form-control bg-light border-0 edit-field" name="last_name" value="<?= clean($profile['last_name']) ?>" readonly required></div>
+            <div class="mb-3"><label class="form-label">Email Address</label><input type="email" class="form-control bg-light border-0 edit-field" name="email" value="<?= clean($profile['email']) ?>" readonly required></div>
+            <div class="mb-3"><label class="form-label">Phone Number</label><input class="form-control bg-light border-0 edit-field" name="phone" value="<?= clean($profile['phone'] ?? '') ?>" readonly></div>
+            <div class="mb-0"><label class="form-label">Tenant ID</label><input class="form-control" value="TEN-<?= str_pad((string) $profile['tenant_id'], 4, '0', STR_PAD_LEFT) ?>" disabled></div>
+          </div>
+          <div class="panel">
+            <p class="fw-semibold small mb-3">Emergency Contact</p>
+            <div class="mb-3"><label class="form-label">Contact Name</label><input class="form-control bg-light border-0 edit-field" name="emergency_contact" value="<?= clean($contactName) ?>" readonly required></div>
+            <div class="mb-0"><label class="form-label">Phone Number</label><input class="form-control bg-light border-0 edit-field" name="emergency_phone" value="<?= clean($profile['emergency_phone'] ?? '') ?>" readonly required></div>
+          </div>
+        </div>
+
+        <div class="panel mt-3">
+          <p class="fw-semibold small mb-3">Change Password</p>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">New Password <span class="text-muted">(leave blank to keep current)</span></label>
+              <input type="password" class="form-control edit-field" name="new_password" value="" autocomplete="new-password" minlength="8" readonly>
+            </div>
+          </div>
+        </div>
+
+        <div id="saveProfileBar" class="d-none mt-3 text-end" style="max-width: 960px;">
+          <button type="button" id="cancelEditBtn" class="btn btn-light rounded-pill px-4 me-2">Cancel</button>
+          <button type="submit" class="btn btn-maroon rounded-pill px-4">Save Changes</button>
+        </div>
+      </form>
+
+      <a href="<?= BASE_URL ?>/auth/logout.php" class="btn btn-maroon w-100 mt-4 mx-auto d-block" style="max-width: 960px;"><i class="bi bi-box-arrow-right"></i> Log Out</a>
     </div>
   </div>
 </div>
 
-<form method="post" style="max-width: 720px;">
-  <?= csrf_field() ?>
-  <div class="split-form">
-    <div class="panel">
-      <p class="fw-semibold small mb-3">Personal Information</p>
-      <div class="mb-3"><label class="form-label">First Name</label><input class="form-control" name="first_name" value="<?= clean($profile['first_name']) ?>" required></div>
-      <div class="mb-3"><label class="form-label">Last Name</label><input class="form-control" name="last_name" value="<?= clean($profile['last_name']) ?>" required></div>
-      <div class="mb-3"><label class="form-label">Email Address</label><input type="email" class="form-control" name="email" value="<?= clean($profile['email']) ?>" required></div>
-      <div class="mb-3"><label class="form-label">Phone Number</label><input class="form-control" name="phone" value="<?= clean($profile['phone'] ?? '') ?>"></div>
-      <div class="mb-0"><label class="form-label">Tenant ID</label><input class="form-control" value="TEN-<?= str_pad((string) $profile['tenant_id'], 4, '0', STR_PAD_LEFT) ?>" disabled></div>
-    </div>
-    <div class="panel">
-      <p class="fw-semibold small mb-3">Emergency Contact</p>
-      <div class="mb-3"><label class="form-label">Contact Name</label><input class="form-control" name="emergency_contact" value="<?= clean($contactName) ?>"></div>
-      <div class="mb-3"><label class="form-label">Relationship</label><input class="form-control" name="emergency_relation" value="<?= clean($relation) ?>"></div>
-      <div class="mb-0"><label class="form-label">Phone Number</label><input class="form-control" name="emergency_phone" value="<?= clean($profile['emergency_phone'] ?? '') ?>"></div>
-    </div>
-  </div>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const toggleBtn = document.getElementById('toggleEditBtn');
+  const cancelBtn = document.getElementById('cancelEditBtn');
+  const saveBar = document.getElementById('saveProfileBar');
+  const fields = document.querySelectorAll('.edit-field');
 
-  <div class="panel mt-3">
-    <p class="fw-semibold small mb-3">Change Password</p>
-    <div class="row g-3">
-      <div class="col-md-6">
-        <label class="form-label">New Password <span class="text-muted">(leave blank to keep current)</span></label>
-        <input type="password" class="form-control" name="new_password" value="" autocomplete="new-password" minlength="8">
-      </div>
-    </div>
-  </div>
+  function setEditing(isEditing) {
+    fields.forEach(function (field) {
+      if (isEditing) {
+        field.removeAttribute('readonly');
+        field.classList.remove('bg-light', 'border-0');
+        field.classList.add('bg-white', 'border');
+      } else {
+        field.setAttribute('readonly', 'readonly');
+        field.classList.remove('bg-white', 'border');
+        field.classList.add('bg-light', 'border-0');
+      }
+    });
 
-  <div class="d-flex gap-2 mt-3" style="max-width: 720px;">
-    <button class="btn btn-maroon">Save Changes</button>
-    <a href="<?= BASE_URL ?>/tenant/profile.php" class="btn btn-light">Cancel</a>
-  </div>
-</form>
+    if (saveBar) {
+      saveBar.classList.toggle('d-none', !isEditing);
+    }
+  }
 
-<a href="<?= BASE_URL ?>/auth/logout.php" class="btn btn-maroon w-100 mt-4" style="max-width: 720px;"><i class="bi bi-box-arrow-right"></i> Log Out</a>
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', function () {
+      const isEditing = !fields.length || !fields[0].hasAttribute('readonly');
+      setEditing(!isEditing);
+    });
+  }
+
+  if (cancelBtn) {
+    cancelBtn.addEventListener('click', function () {
+      setEditing(false);
+    });
+  }
+});
+</script>
 <?php include __DIR__ . '/../includes/footer.php'; ?>

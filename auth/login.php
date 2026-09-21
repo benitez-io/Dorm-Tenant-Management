@@ -45,7 +45,7 @@ include __DIR__ . '/../includes/header.php';
     <div class="auth-panel-left auth-sidebar register-style-sidebar">
       <div class="sidebar-circle-accent"></div>
       <div class="position-relative z-1">
-        <div class="sidebar-icon-wrapper mb-3 d-flex align-items-center justify-content-center rounded-3"><i class="bi bi-mortarboard-fill fs-4 text-white"></i></div>
+        <div class="sidebar-icon-wrapper mb-3 d-flex align-items-center justify-content-center rounded-3"><i class="bi bi-box-arrow-in-right fs-4 text-white"></i></div>
         <h2 class="fw-bold fs-4 text-white mb-1">Dorm Tenant<br>Management System</h2>
         <p class="sidebar-description text-white-50 xs-text mb-3">Tenant Portal Access</p>
         <div class="sidebar-compact-list">

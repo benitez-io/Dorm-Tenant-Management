@@ -110,7 +110,7 @@ require_once __DIR__ . '/../includes/module_tabs.php';
 require_once __DIR__ . '/../includes/page_header.php';
 render_page_header(
     'bi-people-fill',
-    'Tenant Management',
+    'Tenant Registration',
     'Review applications, track tenant status, and manage check-in/check-out.',
     '<a href="' . BASE_URL . '/admin/users.php" class="btn btn-maroon"><i class="bi bi-plus-lg"></i> New Application</a>'
 );
@@ -215,7 +215,7 @@ $statusPills = [
           <label class="form-label">Reason <span class="text-muted">(optional, but the applicant will see it)</span></label>
           <textarea class="form-control" name="reason" rows="3" placeholder="e.g. Missing required documents, no rooms matching your request…"></textarea>
         </div>
-        <div class="modal-footer"><button class="btn btn-light" data-bs-dismiss="modal" type="button">Cancel</button><button class="btn btn-outline-danger">Reject Application</button></div>
+        <div class="modal-footer"><button class="btn btn-light" data-bs-dismiss="modal" type="button">Cancel</button><button class="btn btn-outline-maroon">Reject Application</button></div>
       </form>
     </div>
   </div>

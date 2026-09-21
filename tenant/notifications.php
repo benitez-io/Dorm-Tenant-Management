@@ -26,7 +26,7 @@ $stmt = $db->prepare("
 $stmt->execute([$tenant['tenant_id'], $room['room_number'] ?? '__none__']);
 $notifications = $stmt->fetchAll();
 
-$typeIcon = ['Announcement' => '<i class="bi bi-megaphone-fill"></i>', 'Payment Reminder' => '<i class="bi bi-credit-card-fill"></i>', 'Contract Expiry Alert' => '⏰'];
+$typeIcon = ['Announcement' => '<i class="bi bi-megaphone-fill"></i>', 'Payment Reminder' => '<i class="bi bi-credit-card-fill"></i>', 'Contract Expiry Alert' => '<i class="bi bi-calendar2-warning"></i>'];
 $typeTint = ['Announcement' => '', 'Payment Reminder' => 'tint-amber', 'Contract Expiry Alert' => 'tint-blue'];
 
 $pageTitle = 'Notifications';

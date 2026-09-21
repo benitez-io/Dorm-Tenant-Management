@@ -185,20 +185,61 @@ $categoryTotalCount = max(1, array_sum($categoryTotals));
 $pageTitle = 'Admin Dashboard';
 include __DIR__ . '/../includes/header.php';
 
-$activityIcons = [
-    'tenant_registered'   => 'bi-person-plus-fill',
-    'tenant_approved'     => 'bi-check-circle-fill',
-    'tenant_rejected'     => 'bi-x-circle-fill',
-    'tenant_checked_out'  => 'bi-box-arrow-right',
-    'tenant_evicted'      => 'bi-exclamation-octagon-fill',
-    'contract_created'    => 'bi-file-earmark-plus-fill',
-    'contract_renewed'    => 'bi-arrow-repeat',
-    'contract_terminated' => 'bi-file-earmark-x-fill',
-    'payment_recorded'    => 'bi-cash-coin',
-    'payment_verified'    => 'bi-check-circle-fill',
-    'maintenance_submitted' => 'bi-tools',
-    'maintenance_updated' => 'bi-wrench-adjustable-circle-fill',
-];
+/**
+ * Dynamic Bootstrap Icon helper for Dashboard Recent Activity & Audit Logs
+ */
+function getSystemActivityIcon(string $activityType): array {
+    switch (strtolower($activityType)) {
+        case 'registration':
+        case 'tenant_registered':
+            return [
+                'icon' => 'bi-person-plus-fill',
+                'text_color' => 'text-primary',
+                'bg_color' => 'bg-primary-subtle',
+            ];
+        case 'approval':
+        case 'approved':
+            return [
+                'icon' => 'bi-check-circle-fill',
+                'text_color' => 'text-maroon',
+                'bg_color' => 'bg-maroon-subtle',
+            ];
+        case 'rejection':
+        case 'rejected':
+            return [
+                'icon' => 'bi-x-circle-fill',
+                'text_color' => 'text-danger',
+                'bg_color' => 'bg-danger-subtle',
+            ];
+        case 'payment':
+        case 'payment_received':
+            return [
+                'icon' => 'bi-cash-stack',
+                'text_color' => 'text-success',
+                'bg_color' => 'bg-success-subtle',
+            ];
+        case 'checkin':
+        case 'checkout':
+            return [
+                'icon' => 'bi-arrow-left-right',
+                'text_color' => 'text-info',
+                'bg_color' => 'bg-info-subtle',
+            ];
+        case 'maintenance':
+        case 'repair_request':
+            return [
+                'icon' => 'bi-wrench-adjustable',
+                'text_color' => 'text-warning',
+                'bg_color' => 'bg-warning-subtle',
+            ];
+        default:
+            return [
+                'icon' => 'bi-bell-fill',
+                'text_color' => 'text-secondary',
+                'bg_color' => 'bg-light',
+            ];
+    }
+}
 ?>
 <div class="page-header">
   <div>
@@ -277,7 +318,9 @@ $activityIcons = [
           <span class="chart-legend"><span class="legend-pill"><span class="dot" style="background:#800000"></span>Billed</span><span class="legend-pill"><span class="dot" style="background:#2fa15c"></span>Collected</span></span>
         </div>
         <span class="text-muted small">Billed vs. Collected — last 7 months</span>
-        <canvas id="revenueChart" height="90"></canvas>
+        <div class="revenue-chart-wrap">
+          <canvas id="revenueTrendChart" aria-label="Revenue trend chart"></canvas>
+        </div>
         <?php if (!$hasRevenueData): ?><p class="text-muted text-center mt-3">No payment records yet.</p><?php endif; ?>
       </div>
       <div class="panel mt-3">
@@ -306,14 +349,17 @@ $activityIcons = [
       <div class="panel mt-3">
         <div class="panel-header"><h2>Recent Activity</h2><a href="<?= BASE_URL ?>/admin/reports.php" class="group inline-nav-link dashboard-card-footer-link">View all <i class="bi bi-arrow-up-right link-arrow-icon"></i></a></div>
         <?php if (!$recentActivity): ?><p class="text-muted mb-0">Activity will appear here as the system is used.</p><?php endif; ?>
-        <div class="activity-feed">
+        <div class="recent-activity-feed d-flex flex-column gap-2">
           <?php foreach ($recentActivity as $a): ?>
             <?php $rawTimestamp = $a['created_at'] ?? null; ?>
-            <div class="activity-item">
-              <div class="activity-icon"><i class="bi <?= $activityIcons[$a['activity_type']] ?? 'bi-info-circle-fill' ?>"></i></div>
-              <div class="flex-grow-1">
-                <div><?= clean($a['description']) ?></div>
-                <div class="text-muted small js-relative-time" data-relative-time="<?= clean(!empty($rawTimestamp) ? date('c', strtotime((string) $rawTimestamp)) : '') ?>"><?= clean(time_ago($rawTimestamp)) ?></div>
+            <?php $meta = getSystemActivityIcon($a['activity_type'] ?? 'default'); ?>
+            <div class="activity-row d-flex align-items-center gap-3 p-2 rounded-3 hover-bg-light">
+              <div class="icon-avatar rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 <?= $meta['bg_color'] ?>" style="width: 38px; height: 38px;">
+                <i class="bi <?= $meta['icon'] . ' ' . $meta['text_color'] ?> fs-6"></i>
+              </div>
+              <div class="flex-grow-1 min-w-0">
+                <p class="mb-0 text-dark fw-medium xxs-text text-truncate"><?= clean($a['description']) ?></p>
+                <span class="text-muted xxs-text js-relative-time" data-relative-time="<?= clean(!empty($rawTimestamp) ? date('c', strtotime((string) $rawTimestamp)) : '') ?>"><?= clean(time_ago($rawTimestamp)) ?></span>
               </div>
             </div>
           <?php endforeach; ?>
@@ -512,16 +558,99 @@ new Chart(document.getElementById('occupancyDonut'), {
   options: { cutout: '72%', plugins: { legend: { display: false }, tooltip: { enabled: true } } }
 });
 " . ($hasRevenueData ? "
-new Chart(document.getElementById('revenueChart'), {
+const revenueCanvas = document.getElementById('revenueTrendChart');
+const revenueGradient = revenueCanvas.getContext('2d').createLinearGradient(0, 0, 0, revenueCanvas.clientHeight || 260);
+revenueGradient.addColorStop(0, 'rgba(16, 185, 129, 0.12)');
+revenueGradient.addColorStop(1, 'rgba(16, 185, 129, 0)');
+if (window.myRevenueChart) {
+  window.myRevenueChart.destroy();
+}
+window.myRevenueChart = new Chart(revenueCanvas, {
   type: 'line',
   data: {
-    labels: {$chartLabelsJson},
+    labels: {$chartLabelsJson}.map(function (label) { return label.split(' ')[0]; }),
     datasets: [
-      { label: 'Billed', data: {$billedSeriesJson}, borderColor: '#800000', backgroundColor: 'rgba(128,0,0,0.06)', tension: 0.35, fill: true, pointRadius: 3, pointBackgroundColor: '#800000' },
-      { label: 'Collected', data: {$collectedSeriesJson}, borderColor: '#2fa15c', backgroundColor: 'rgba(47,161,92,0.08)', tension: 0.35, fill: true, pointRadius: 3, pointBackgroundColor: '#2fa15c' }
+      { label: 'Billed', data: {$billedSeriesJson}, borderColor: '#800000', backgroundColor: 'transparent', borderWidth: 2.5, tension: 0.35, fill: false, pointRadius: 0, pointHoverRadius: 5, pointHoverBackgroundColor: '#800000' },
+      { label: 'Collected', data: {$collectedSeriesJson}, borderColor: '#10b981', backgroundColor: revenueGradient, borderWidth: 2.5, tension: 0.35, fill: 'origin', pointRadius: 0, pointHoverRadius: 5, pointHoverBackgroundColor: '#10b981' }
     ]
   },
-  options: { plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+  plugins: [{
+    id: 'revenueCrosshair',
+    afterDraw: function (chart) {
+      const activeElements = chart.tooltip?.getActiveElements() || [];
+      if (!activeElements.length) return;
+
+      const x = activeElements[0].element.x;
+      const area = chart.chartArea;
+      const context = chart.ctx;
+      context.save();
+      context.beginPath();
+      context.moveTo(x, area.top);
+      context.lineTo(x, area.bottom);
+      context.lineWidth = 1;
+      context.strokeStyle = 'rgba(128, 0, 0, 0.22)';
+      context.setLineDash([4, 4]);
+      context.stroke();
+      context.restore();
+    }
+  }],
+  options: {
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        enabled: true,
+        backgroundColor: '#ffffff',
+        titleColor: '#212529',
+        bodyColor: '#800000',
+        borderColor: '#e9ecef',
+        borderWidth: 1,
+        cornerRadius: 12,
+        displayColors: false,
+        padding: 12,
+        caretPadding: 8,
+        shadowColor: 'rgba(0, 0, 0, 0.1)',
+        shadowBlur: 25,
+        shadowOffsetY: 8,
+        titleFont: { weight: '700' },
+        bodyFont: { weight: '600' },
+        callbacks: {
+          title: function (items) {
+            return items[0]?.label || '';
+          },
+          label: function (context) {
+            return context.dataset.label + ': ' + new Intl.NumberFormat('en-PH', {
+              style: 'currency',
+              currency: 'PHP',
+              maximumFractionDigits: 0
+            }).format(context.parsed.y || 0);
+          },
+          labelTextColor: function (context) {
+            return context.dataset.label === 'Collected' ? '#10b981' : '#800000';
+          }
+        }
+      }
+    },
+    scales: {
+      x: {
+        grid: { display: false },
+        border: { display: false },
+        ticks: { color: '#8c98a4', font: { size: 11, weight: '600' } }
+      },
+      y: {
+        beginAtZero: true,
+        grid: { color: '#f1f5f9', borderDash: [4, 4] },
+        border: { display: false },
+        ticks: {
+          color: '#8c98a4',
+          font: { size: 11, weight: '600' },
+          callback: function (value) {
+            return '₱' + Math.round(Number(value) / 1000) + 'K';
+          }
+        }
+      }
+    }
+  }
 });
 " : "") . "
 </script>";

@@ -8,16 +8,16 @@ require_once __DIR__ . '/../includes/module_tabs.php';
 
 $categories = [
     'occupancy'   => ['title' => 'Occupancy Reports',   'reports' => [
-        ['icon' => '<i class="bi bi-building"></i>', 'title' => 'Monthly Occupancy Report', 'desc' => 'Detailed occupancy statistics, vacancy rates, and room turnover for the current month.'],
+        ['icon' => '<i class="bi bi-door-open-fill"></i>', 'title' => 'Monthly Occupancy Report', 'desc' => 'Detailed occupancy statistics, vacancy rates, and room turnover for the current month.'],
     ]],
     'payment'     => ['title' => 'Payment Reports',     'reports' => [
-        ['icon' => '<i class="bi bi-credit-card-fill"></i>', 'title' => 'Monthly Payment Report', 'desc' => 'Payment collection summary, outstanding balances, and revenue breakdown.'],
+        ['icon' => '<i class="bi bi-wallet2"></i>', 'title' => 'Monthly Payment Report', 'desc' => 'Payment collection summary, outstanding balances, and revenue breakdown.'],
     ]],
     'tenant'      => ['title' => 'Tenant Reports',      'reports' => [
         ['icon' => '<i class="bi bi-people-fill"></i>', 'title' => 'Tenant Directory', 'desc' => 'Complete list of all current tenants with contact information and room assignments.'],
     ]],
     'maintenance' => ['title' => 'Maintenance Reports', 'reports' => [
-        ['icon' => '<i class="bi bi-tools"></i>', 'title' => 'Maintenance Summary Report', 'desc' => 'Overview of all maintenance requests, completion rates, and pending tasks.'],
+        ['icon' => '<i class="bi bi-wrench-adjustable"></i>', 'title' => 'Maintenance Summary Report', 'desc' => 'Overview of all maintenance requests, completion rates, and pending tasks.'],
     ]],
 ];
 ?>
@@ -41,9 +41,9 @@ $categories = [
             <div><h3><?= clean($r['title']) ?></h3><p><?= clean($r['desc']) ?></p></div>
           </div>
           <div class="report-card-actions">
-            <a href="<?= BASE_URL ?>/admin/report_print.php?type=<?= $key ?>&mode=view" class="btn btn-outline-maroon js-review-btn" data-review-url="<?= BASE_URL ?>/admin/report_print.php?type=<?= $key ?>&mode=view"><i class="bi bi-eye-fill"></i> Review</a>
-            <a href="<?= BASE_URL ?>/admin/report_print.php?type=<?= $key ?>" target="_blank" class="btn btn-maroon"><i class="bi bi-printer-fill"></i> Print</a>
-            <a href="<?= BASE_URL ?>/admin/report_export.php?type=<?= $key ?>" class="btn btn-outline-maroon"><i class="bi bi-file-earmark-pdf-fill"></i> Export PDF</a>
+            <a href="<?= BASE_URL ?>/admin/report_print.php?type=<?= $key ?>&mode=view" class="btn btn-outline-maroon btn-sm px-3 py-1.5 rounded-pill fs-7 js-review-btn" data-review-url="<?= BASE_URL ?>/admin/report_print.php?type=<?= $key ?>&mode=view"><i class="bi bi-eye-fill"></i> Review</a>
+            <a href="<?= BASE_URL ?>/admin/report_print.php?type=<?= $key ?>" target="_blank" class="btn btn-maroon btn-sm px-3 py-1.5 rounded-pill fs-7"><i class="bi bi-printer-fill"></i> Print</a>
+            <a href="<?= BASE_URL ?>/admin/report_export.php?type=<?= $key ?>" class="btn btn-outline-maroon btn-sm px-3 py-1.5 rounded-pill fs-7"><i class="bi bi-file-earmark-pdf-fill"></i> Export PDF</a>
           </div>
         </div>
       <?php endforeach; ?>

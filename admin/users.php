@@ -51,7 +51,7 @@ $pageTitle = 'Register Account';
 include __DIR__ . '/../includes/header.php';
 require_once __DIR__ . '/../includes/module_tabs.php';
 require_once __DIR__ . '/../includes/page_header.php';
-render_page_header('bi-person-fill', 'User Management', 'Register accounts, manage login credentials, and assign roles.');
+render_page_header('bi-person-gear', 'User Accounts', 'Register accounts, manage login credentials, and assign roles.');
 render_module_tabs([
   ['key' => 'register', 'label' => 'Register Account', 'href' => '/admin/users.php'],
   ['key' => 'credentials', 'label' => 'Login Credentials', 'href' => '/admin/credentials.php'],
@@ -84,8 +84,8 @@ render_module_tabs([
             <div class="strength-bar strength-segment flex-fill rounded-pill"></div>
           </div>
           <div class="d-flex justify-content-between mt-1">
-            <span id="strength-label" class="strength-label small fw-bold text-danger">Very Weak</span>
-            <span id="requirements-counter" class="strength-count small text-muted">0/5 requirements met</span>
+            <span id="strength-label" class="strength-label small fw-bold text-danger" aria-live="polite"></span>
+            <span id="requirements-counter" class="strength-count small text-muted" aria-live="polite">0/5 requirements met</span>
           </div>
         </div>
         <div class="mb-3"><label class="form-label">User Category</label><select name="category" class="form-select"><option value="" disabled selected>Select category...</option><option value="student">Student / Resident</option><option value="staff">Administrative Staff</option></select></div>
@@ -132,19 +132,27 @@ document.addEventListener('DOMContentLoaded', () => {
       ];
 
       if (strengthText) {
-        strengthText.textContent = value.length === 0 ? 'Very Weak' : levels[score - 1]?.label || 'Very Weak';
-        strengthText.style.color = value.length === 0 ? '#ef4444' : levels[score - 1]?.color || '#ef4444';
+        strengthText.textContent = value.length === 0 ? '' : levels[score - 1]?.label || 'Very Weak';
+        strengthText.style.color = value.length === 0 ? '' : levels[score - 1]?.color || '#ef4444';
       }
 
       if (counterText) {
-        counterText.textContent = `${score}/5 requirements met`;
+        counterText.textContent = value.length === 0 ? '0/5 requirements met' : `${score}/5 requirements met`;
       }
 
       bars.forEach((bar, index) => {
+        if (value.length === 0) {
+          bar.style.backgroundColor = '#e2e8f0';
+          bar.style.borderColor = 'rgba(148, 163, 184, 0.15)';
+          return;
+        }
+
         if (index < score) {
           bar.style.backgroundColor = levels[score - 1]?.color || '#10b981';
+          bar.style.borderColor = levels[score - 1]?.color || '#10b981';
         } else {
           bar.style.backgroundColor = '#e2e8f0';
+          bar.style.borderColor = 'rgba(148, 163, 184, 0.15)';
         }
       });
     };

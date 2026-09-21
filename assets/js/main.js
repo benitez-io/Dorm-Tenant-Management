@@ -137,16 +137,23 @@ document.addEventListener('DOMContentLoaded', function () {
     const activeLevel = value.length === 0 ? levels[0] : levels[Math.max(score - 1, 0)] || levels[0];
 
     if (strengthText) {
-      strengthText.textContent = value.length === 0 ? 'Very Weak' : activeLevel.label;
-      strengthText.style.color = value.length === 0 ? '#ef4444' : activeLevel.color;
+      strengthText.textContent = value.length === 0 ? '' : activeLevel.label;
+      strengthText.style.color = value.length === 0 ? '' : activeLevel.color;
     }
 
     if (counterText) {
-      counterText.textContent = score + '/5 requirements met';
-      counterText.style.color = score >= 4 ? '#1e8a4c' : '#64748b';
+      counterText.textContent = value.length === 0 ? '0/5 requirements met' : score + '/5 requirements met';
+      counterText.style.color = value.length === 0 ? '#64748b' : (score >= 4 ? '#1e8a4c' : '#64748b');
     }
 
     bars.forEach(function (bar, index) {
+      if (value.length === 0) {
+        bar.style.backgroundColor = '#e2e8f0';
+        bar.style.borderColor = 'rgba(148, 163, 184, 0.15)';
+        bar.style.opacity = '0.8';
+        return;
+      }
+
       const isActive = index < score;
       bar.style.backgroundColor = isActive ? activeLevel.color : '#e2e8f0';
       bar.style.borderColor = isActive ? activeLevel.color : 'rgba(148, 163, 184, 0.15)';

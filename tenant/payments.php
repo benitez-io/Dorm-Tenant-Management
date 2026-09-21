@@ -153,7 +153,7 @@ include __DIR__ . '/../includes/header.php';
             <input type="text" class="form-control" value="<?= peso($contract['monthly_rent']) ?>" disabled>
             <div class="form-text">Your monthly rent, set on your contract.</div>
           </div>
-          <button class="btn btn-maroon w-100">
+          <button class="btn btn-maroon-primary rounded-pill w-100">
             <i class="bi bi-phone"></i> Pay with GCash
           </button>
           <p class="text-muted small mt-2 mb-0">You'll be redirected to GCash to complete payment securely. Your payment is confirmed automatically — no need to upload a receipt.</p>

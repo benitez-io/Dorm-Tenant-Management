@@ -90,7 +90,7 @@ $pageTitle = 'Log In Credentials';
 include __DIR__ . '/../includes/header.php';
 require_once __DIR__ . '/../includes/module_tabs.php';
 require_once __DIR__ . '/../includes/page_header.php';
-render_page_header('bi-person-fill', 'User Management', 'Register accounts, manage login credentials, and assign roles.');
+render_page_header('bi-shield-lock-fill', 'Security Credentials', 'Manage user access, password records, and account security settings.');
 render_module_tabs([
   ['key' => 'register', 'label' => 'Register Account', 'href' => '/admin/users.php'],
   ['key' => 'credentials', 'label' => 'Login Credentials', 'href' => '/admin/credentials.php'],

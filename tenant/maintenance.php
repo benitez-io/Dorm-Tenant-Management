@@ -9,32 +9,6 @@ if (!$tenant || $tenant['approval_status'] !== 'Approved') {
     redirect('/tenant/dashboard.php');
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    csrf_verify();
-
-    if (!$tenant['room_id']) {
-        flash('error', "You don't have a room assigned yet, so there's nothing to file a request for.");
-    } else {
-        $title = str_input($_POST, 'issue_type');
-        $desc  = str_input($_POST, 'description');
-
-        if ($title === '' || $desc === '') {
-            flash('error', 'Please choose an issue type and describe the problem.');
-        } else {
-            try {
-                $photo = handle_upload('photo', 'maintenance', ['jpg', 'jpeg', 'png']);
-                $db->prepare('INSERT INTO maintenance_requests (tenant_id, room_id, issue_title, issue_description, photo_file) VALUES (?,?,?,?,?)')
-                   ->execute([$tenant['tenant_id'], $tenant['room_id'], $title, $desc, $photo]);
-                log_activity($db, 'maintenance_submitted', $title . ' request submitted', $tenant['tenant_id']);
-                flash('success', 'Maintenance request submitted.');
-            } catch (RuntimeException $e) {
-                flash('error', $e->getMessage());
-            }
-        }
-    }
-    redirect('/tenant/maintenance.php');
-}
-
 $requests = $db->prepare('SELECT * FROM maintenance_requests WHERE tenant_id = ? ORDER BY date_submitted DESC');
 $requests->execute([$tenant['tenant_id']]);
 $requests = $requests->fetchAll();
@@ -51,7 +25,7 @@ include __DIR__ . '/../includes/header.php';
 <div class="collapse mb-3" id="newRequestForm">
   <div class="panel">
     <div class="panel-header"><h2>Submit New Request</h2></div>
-    <form method="post" enctype="multipart/form-data">
+    <form method="post" action="<?= BASE_URL ?>/tenant/maintenance_process.php" enctype="multipart/form-data">
       <?= csrf_field() ?>
       <div class="mb-3">
         <label class="form-label">Issue Type *</label>
@@ -66,17 +40,55 @@ include __DIR__ . '/../includes/header.php';
       </div>
       <div class="mb-3">
         <label class="form-label">Upload Photo <span class="text-muted">(optional)</span></label>
-        <label class="dropzone d-block">
-          <span class="dz-icon"><i class="bi bi-camera-fill"></i></span>
-          <div>Take or upload photo</div>
-          <input type="file" name="photo" accept="image/*">
-        </label>
+        <div id="maintenanceDropzone" class="dropzone d-block" tabindex="0" aria-label="Upload maintenance photo">
+          <span class="dz-icon d-flex justify-content-center align-items-center gap-2 text-maroon">
+            <i class="bi bi-cloud-arrow-up-fill fs-3"></i>
+            <i class="bi bi-camera-fill fs-4"></i>
+          </span>
+          <div>Take a photo or choose a file</div>
+          <small class="dz-hint text-muted">Supports JPG, PNG up to 5MB</small>
+          <div class="d-flex justify-content-center gap-2 mt-3 flex-wrap">
+            <button type="button" class="btn btn-maroon-primary btn-sm rounded-pill photo-trigger" data-input="cameraInput">Take Photo</button>
+            <button type="button" class="btn btn-outline-maroon btn-sm rounded-pill photo-trigger" data-input="fileInput">Upload Image File</button>
+            <input type="file" id="cameraInput" name="camera_photo" accept="image/*" capture="environment" class="d-none">
+            <input type="file" id="fileInput" name="maintenance_photo" accept="image/*" class="d-none">
+          </div>
+          <div id="maintenancePhotoPreview" class="mt-3 d-none">
+            <div class="d-flex align-items-center gap-3 p-2 border rounded-3 bg-light text-start">
+              <img id="maintenancePreviewImage" src="" alt="Preview" class="img-thumbnail" style="display:none; width:74px; height:74px; object-fit:cover;">
+              <div class="flex-grow-1">
+                <div class="small fw-semibold text-dark">Selected photo</div>
+                <div id="maintenancePhotoName" class="small text-muted">No image selected</div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
       <div class="d-flex gap-2">
-        <button class="btn btn-maroon flex-grow-1">Submit Request</button>
-        <button type="button" class="btn btn-light" data-bs-toggle="collapse" data-bs-target="#newRequestForm">Cancel</button>
+        <button class="btn btn-maroon-primary rounded-pill flex-grow-1">Submit Request</button>
+        <button type="button" class="btn btn-light rounded-pill" data-bs-toggle="collapse" data-bs-target="#newRequestForm">Cancel</button>
       </div>
     </form>
+  </div>
+</div>
+
+<div class="modal fade" id="maintenanceCameraModal" tabindex="-1" aria-labelledby="maintenanceCameraModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header">
+        <h5 class="modal-title" id="maintenanceCameraModalLabel">Take Maintenance Photo</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body text-center">
+        <video id="maintenanceCameraPreview" class="w-100 rounded-3 bg-dark" autoplay playsinline></video>
+        <canvas id="maintenanceCameraCanvas" class="d-none"></canvas>
+        <p id="maintenanceCameraStatus" class="small text-muted mt-2 mb-0">Allow camera access to take a photo.</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-maroon-primary" id="captureMaintenancePhoto"><i class="bi bi-camera-fill"></i> Capture Photo</button>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -89,12 +101,19 @@ include __DIR__ . '/../includes/header.php';
     $pct = $progress === 1 ? 15 : ($progress === 2 ? 60 : 100);
   ?>
     <div class="request-card">
-      <div class="d-flex justify-content-between">
+      <div class="d-flex justify-content-between align-items-start gap-2">
         <strong><?= clean($r['issue_description']) ?></strong>
         <span class="badge badge-<?= status_badge_class($r['status']) ?>"><?= clean($r['status']) ?></span>
       </div>
       <div class="text-muted small mb-1"><?= clean($r['issue_title']) ?> · <?= clean(date('M j, Y', strtotime($r['date_submitted']))) ?></div>
       <?php if ($r['assigned_to']): ?><div class="small mb-2">Assigned to: <?= clean($r['assigned_to']) ?></div><?php endif; ?>
+      <?php if (!empty($r['photo_file'])): ?>
+        <div class="mb-2">
+          <button type="button" class="btn btn-outline-maroon btn-sm rounded-pill maintenance-photo-trigger" data-image="<?= BASE_URL . '/' . ltrim($r['photo_file'], '/') ?>" data-title="<?= clean($r['issue_title']) ?>">
+            <i class="bi bi-image"></i> View Photo
+          </button>
+        </div>
+      <?php endif; ?>
       <div class="d-flex justify-content-between small text-muted"><span>Progress</span><span><?= $pct ?>%</span></div>
       <div class="request-progress-bar"><div class="request-progress-fill" style="width:<?= $pct ?>%"></div></div>
       <div class="timeline">
@@ -118,4 +137,180 @@ include __DIR__ . '/../includes/header.php';
     </div>
   <?php endforeach; ?>
 </div>
+
+<div class="modal fade" id="maintenanceImageModal" tabindex="-1" aria-labelledby="maintenanceImageModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header">
+        <h5 class="modal-title" id="maintenanceImageModalLabel">Maintenance Photo</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body text-center">
+        <img id="maintenanceImageModalImage" src="" alt="Maintenance request preview" class="img-fluid rounded-3 border">
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const cameraInput = document.getElementById('cameraInput');
+  const fileInput = document.getElementById('fileInput');
+  const previewBox = document.getElementById('maintenancePhotoPreview');
+  const previewImage = document.getElementById('maintenancePreviewImage');
+  const photoName = document.getElementById('maintenancePhotoName');
+  const cameraModalElement = document.getElementById('maintenanceCameraModal');
+  const cameraPreview = document.getElementById('maintenanceCameraPreview');
+  const cameraCanvas = document.getElementById('maintenanceCameraCanvas');
+  const cameraStatus = document.getElementById('maintenanceCameraStatus');
+  const captureButton = document.getElementById('captureMaintenancePhoto');
+  let cameraStream = null;
+
+  function updatePreview(file) {
+    if (!file || !previewBox || !previewImage || !photoName) {
+      return;
+    }
+
+    const url = URL.createObjectURL(file);
+    previewImage.src = url;
+    previewImage.style.display = 'block';
+    photoName.textContent = file.name;
+    previewBox.classList.remove('d-none');
+  }
+
+  if (cameraInput) {
+    cameraInput.addEventListener('change', function () {
+      if (this.files && this.files[0]) {
+        updatePreview(this.files[0]);
+      }
+    });
+  }
+
+  if (fileInput) {
+    fileInput.addEventListener('change', function () {
+      if (this.files && this.files[0]) {
+        updatePreview(this.files[0]);
+      }
+    });
+  }
+
+  function isMobileDevice() {
+    return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  }
+
+  function stopCameraStream() {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(function (track) {
+        track.stop();
+      });
+      cameraStream = null;
+    }
+    if (cameraPreview) {
+      cameraPreview.srcObject = null;
+    }
+  }
+
+  async function openCameraModal() {
+    if (!cameraModalElement || !cameraPreview || !captureButton || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      if (cameraInput) {
+        cameraInput.value = '';
+        cameraInput.click();
+      }
+      return;
+    }
+
+    const modal = bootstrap.Modal.getOrCreateInstance(cameraModalElement);
+    cameraStatus.textContent = 'Requesting camera access…';
+    captureButton.disabled = true;
+    modal.show();
+
+    try {
+      cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' } }, audio: false });
+      cameraPreview.srcObject = cameraStream;
+      cameraStatus.textContent = 'Position the maintenance issue in view, then capture the photo.';
+      captureButton.disabled = false;
+    } catch (error) {
+      cameraStatus.textContent = 'Camera access was unavailable. You can choose an image file instead.';
+      captureButton.disabled = true;
+    }
+  }
+
+  if (captureButton) {
+    captureButton.addEventListener('click', function () {
+      if (!cameraPreview || !cameraCanvas || !cameraInput || !cameraPreview.videoWidth) {
+        return;
+      }
+
+      cameraCanvas.width = cameraPreview.videoWidth;
+      cameraCanvas.height = cameraPreview.videoHeight;
+      cameraCanvas.getContext('2d').drawImage(cameraPreview, 0, 0, cameraCanvas.width, cameraCanvas.height);
+      cameraCanvas.toBlob(function (blob) {
+        if (!blob) return;
+        const file = new File([blob], 'maintenance-camera-photo.jpg', { type: 'image/jpeg' });
+        const transfer = new DataTransfer();
+        transfer.items.add(file);
+        cameraInput.files = transfer.files;
+        updatePreview(file);
+        bootstrap.Modal.getOrCreateInstance(cameraModalElement).hide();
+      }, 'image/jpeg', 0.9);
+    });
+  }
+
+  if (cameraModalElement) {
+    cameraModalElement.addEventListener('hidden.bs.modal', function () {
+      stopCameraStream();
+      if (captureButton) captureButton.disabled = false;
+    });
+  }
+
+  document.querySelectorAll('.photo-trigger').forEach(function (button) {
+    button.addEventListener('click', function (event) {
+      event.preventDefault();
+      const targetId = this.dataset.input;
+      const target = document.getElementById(targetId);
+      if (!target) return;
+      if (targetId === 'cameraInput' && !isMobileDevice()) {
+        openCameraModal();
+        return;
+      }
+      target.value = '';
+      target.click();
+    });
+  });
+
+  const dropzone = document.getElementById('maintenanceDropzone');
+  if (dropzone) {
+    dropzone.addEventListener('click', function (event) {
+      if (event.target.closest('button') || event.target.closest('input')) {
+        return;
+      }
+      if (fileInput) {
+        fileInput.value = '';
+        fileInput.click();
+      }
+    });
+    dropzone.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        if (fileInput) {
+          fileInput.value = '';
+          fileInput.click();
+        }
+      }
+    });
+  }
+
+  document.querySelectorAll('.maintenance-photo-trigger').forEach(function (button) {
+    button.addEventListener('click', function () {
+      const modal = document.getElementById('maintenanceImageModal');
+      const image = document.getElementById('maintenanceImageModalImage');
+      if (!modal || !image) return;
+      image.src = this.dataset.image || '';
+      image.alt = this.dataset.title || 'Maintenance request photo';
+      const bsModal = new bootstrap.Modal(modal);
+      bsModal.show();
+    });
+  });
+});
+</script>
 <?php include __DIR__ . '/../includes/footer.php'; ?>

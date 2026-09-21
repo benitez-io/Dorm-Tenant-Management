@@ -64,7 +64,7 @@ include __DIR__ . '/../includes/header.php';
     <div class="auth-panel-left auth-sidebar register-style-sidebar">
       <div class="sidebar-circle-accent"></div>
       <div class="position-relative z-1">
-        <div class="sidebar-icon-wrapper mb-3 d-flex align-items-center justify-content-center rounded-3"><i class="bi bi-mortarboard-fill fs-4 text-white"></i></div>
+        <div class="sidebar-icon-wrapper mb-3 d-flex align-items-center justify-content-center rounded-3"><i class="bi bi-key-fill fs-4 text-white"></i></div>
         <h2 class="fw-bold fs-4 text-white mb-1">Dorm Tenant<br>Management System</h2>
         <p class="sidebar-description text-white-50 xs-text mb-3">Secure Password Reset</p>
         <div class="sidebar-compact-list"><div class="sidebar-info-card"><div class="sidebar-info-icon"><i class="bi bi-key fs-6"></i></div><div><h6>Verification Code</h6><span>Confirm your email securely</span></div></div><div class="sidebar-info-card"><div class="sidebar-info-icon"><i class="bi bi-shield-check fs-6"></i></div><div><h6>New Password</h6><span>Protect your tenant account</span></div></div></div>
@@ -157,6 +157,10 @@ include __DIR__ . '/../includes/header.php';
               <div class="strength-segment flex-fill" id="seg3"></div>
               <div class="strength-segment flex-fill" id="seg4"></div>
               <div class="strength-segment flex-fill" id="seg5"></div>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mt-1">
+              <span id="strength-label" class="strength-label strength-label-text fw-bold" aria-live="polite"></span>
+              <span id="requirements-counter" class="strength-count requirements-met-text" aria-live="polite">0/5 requirements met</span>
             </div>
           </div>
 
@@ -447,6 +451,8 @@ $extraScripts = <<<'HTML'
       special: document.getElementById('req-special')
     };
 
+    const strengthText = document.getElementById('strength-label');
+    const counterText = document.getElementById('requirements-counter');
     const dotValid = document.getElementById('dot-valid');
     const dotMatch = document.getElementById('dot-match');
     const segments = ['seg1', 'seg2', 'seg3', 'seg4', 'seg5'].map(id => document.getElementById(id));
@@ -510,6 +516,16 @@ $extraScripts = <<<'HTML'
       const isPasswordValid = passedCount === 5;
       const isMatch = isPasswordValid && val === confirmVal && confirmVal.length > 0;
       const otpDone = otpHidden ? otpHidden.value.length === 6 : true;
+
+      if (strengthText) {
+        strengthText.textContent = val.length === 0 ? '' : (isPasswordValid ? 'Very Strong' : ['Very Weak', 'Weak', 'Fair', 'Good'][Math.max(passedCount - 1, 0)] || 'Very Weak');
+        strengthText.style.color = val.length === 0 ? '' : (isPasswordValid ? '#700000' : '#ef4444');
+      }
+
+      if (counterText) {
+        counterText.textContent = val.length === 0 ? '0/5 requirements met' : `${passedCount}/5 requirements met`;
+        counterText.style.color = val.length === 0 ? '#64748b' : (passedCount >= 4 ? '#1e8a4c' : '#64748b');
+      }
 
       if (isPasswordValid) {
         dotValid.classList.add('active-maroon');

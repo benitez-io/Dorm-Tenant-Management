@@ -32,6 +32,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         flash('success', 'Marked as completed.');
     }
 
+    if ($action === 'update_status') {
+        $status = $_POST['status'] ?? '';
+        $team = trim((string) ($_POST['team'] ?? ''));
+
+        if (!in_array($status, ['Pending', 'Ongoing', 'Completed'], true)) {
+            flash('error', 'Please choose a valid maintenance status.');
+        } else {
+            $assignedTo = $team !== '' ? $team : null;
+            $resolvedDate = $status === 'Completed' ? date('Y-m-d') : null;
+            $db->prepare('UPDATE maintenance_requests SET status=?, assigned_to=?, date_resolved=? WHERE maintenance_id=?')
+               ->execute([$status, $assignedTo, $resolvedDate, $id]);
+
+            $mTenant = $db->prepare('SELECT tenant_id FROM maintenance_requests WHERE maintenance_id=?');
+            $mTenant->execute([$id]);
+            log_activity($db, 'maintenance_updated', "Request #$id updated to $status" . ($assignedTo ? " and assigned to $assignedTo" : ''), $mTenant->fetch()['tenant_id'] ?? null);
+            flash('success', 'Maintenance request updated.');
+        }
+    }
+
     if ($action === 'log_request') {
         $tenantId = (int) ($_POST['tenant_id'] ?? 0);
         $title    = str_input($_POST, 'issue_type');
@@ -116,7 +135,7 @@ include __DIR__ . '/../includes/header.php';
 require_once __DIR__ . '/../includes/module_tabs.php';
 require_once __DIR__ . '/../includes/page_header.php';
 render_page_header(
-    'bi-tools',
+    'bi-wrench-adjustable',
     'Maintenance Management',
     'Log requests, assign tasks to teams, and track resolution progress.',
     '<button type="button" class="btn btn-maroon" data-bs-toggle="modal" data-bs-target="#logRequestModal"><i class="bi bi-plus-lg"></i> Log New Request</button>'
@@ -159,35 +178,83 @@ $priorityBadge = ['Urgent' => 'danger', 'High' => 'warning', 'Medium' => 'info',
     <p class="text-muted text-center py-4">No maintenance requests found.</p>
   <?php else: ?>
   <div class="table-responsive">
-    <table class="table app-table align-middle">
-      <thead><tr><th>Request</th><th>Room / Tenant</th><th>Category</th><th>Priority</th><th>Status</th><th>Assigned To</th><th>Reported</th><th class="text-end">Actions</th></tr></thead>
+    <table class="table app-table table-maintenance align-middle">
+      <thead><tr><th class="maintenance-expand-column" aria-label="Expand"></th><th>Request</th><th>Priority</th><th>Status</th><th>Reported</th><th class="text-end">Actions</th></tr></thead>
       <tbody>
       <?php foreach ($requests as $m): ?>
-        <tr>
-          <td><strong><?= clean($m['issue_title']) ?></strong><div class="text-muted small"><?= clean(mb_strimwidth($m['issue_description'], 0, 60, '…')) ?></div></td>
-          <td class="small">Room <?= clean($m['room_number']) ?><div class="text-muted"><?= clean($m['first_name'] . ' ' . $m['last_name']) ?></div></td>
-          <td class="small"><?= clean(maintenance_category_bucket($m['issue_title'])) ?></td>
-          <td><span class="badge badge-<?= $priorityBadge[$m['priority_level']] ?? 'secondary' ?>"><?= clean($m['priority_level']) ?></span></td>
-          <td><span class="badge badge-<?= status_badge_class($m['status']) ?>">● <?= clean($m['status']) ?></span></td>
-          <td class="small"><?= clean($m['assigned_to'] ?: '—') ?></td>
+        <tr class="main-row clickable-row" role="button" data-bs-toggle="collapse" data-bs-target="#details-<?= $m['maintenance_id'] ?>" aria-controls="details-<?= $m['maintenance_id'] ?>" aria-expanded="false">
+          <td class="text-center maintenance-expand-column"><i class="bi bi-chevron-down toggle-icon text-muted" aria-hidden="true"></i></td>
+          <td><div class="fw-bold text-dark"><?= clean($m['issue_title']) ?></div><div class="text-muted small"><?= clean(mb_strimwidth($m['issue_description'], 0, 60, '…')) ?></div></td>
+          <td><span class="badge maintenance-badge badge-<?= $priorityBadge[$m['priority_level']] ?? 'secondary' ?>"><?= clean($m['priority_level']) ?></span></td>
+          <td><span class="badge maintenance-badge badge-<?= status_badge_class($m['status']) ?>">● <?= clean($m['status']) ?></span></td>
           <td class="small text-muted"><?= clean(date('n/j/Y', strtotime($m['date_submitted']))) ?></td>
-          <td class="text-end">
-            <?php if ($m['status'] === 'Pending'): ?>
-              <form method="post" class="d-inline-flex gap-1 align-items-center">
-                <?= csrf_field() ?>
-                <input type="hidden" name="action" value="assign">
-                <input type="hidden" name="maintenance_id" value="<?= $m['maintenance_id'] ?>">
-                <select name="team" class="form-select form-select-sm" required style="width:auto;">
-                  <option value="">Assign…</option>
-                  <?php foreach ($teams as $team): ?><option><?= clean($team) ?></option><?php endforeach; ?>
-                </select>
-                <button class="btn btn-sm btn-maroon">Go</button>
-              </form>
-            <?php elseif ($m['status'] === 'Ongoing'): ?>
-              <form method="post" class="d-inline"><?= csrf_field() ?><input type="hidden" name="action" value="complete"><input type="hidden" name="maintenance_id" value="<?= $m['maintenance_id'] ?>"><button class="btn btn-sm btn-outline-maroon">Mark Completed</button></form>
-            <?php else: ?>
-              <span class="text-muted small"><?= $m['date_resolved'] ? clean(date('n/j/Y', strtotime($m['date_resolved']))) : '—' ?></span>
-            <?php endif; ?>
+          <td class="text-end" onclick="event.stopPropagation();" onmousedown="event.stopPropagation();" onfocus="event.stopPropagation();">
+            <div class="d-flex justify-content-end gap-2 flex-wrap align-items-center">
+              <?php if ($m['status'] === 'Pending'): ?>
+                <form method="post" class="d-inline-flex gap-1 align-items-center" onclick="event.stopPropagation();" onmousedown="event.stopPropagation();">
+                  <?= csrf_field() ?>
+                  <input type="hidden" name="action" value="assign">
+                  <input type="hidden" name="maintenance_id" value="<?= $m['maintenance_id'] ?>">
+                  <select name="team" class="form-select form-select-sm assign-select" required onclick="event.stopPropagation();" onmousedown="event.stopPropagation();" onfocus="event.stopPropagation();">
+                    <option value="">Assign…</option>
+                    <?php foreach ($teams as $team): ?><option><?= clean($team) ?></option><?php endforeach; ?>
+                  </select>
+                  <button type="submit" class="btn btn-sm btn-maroon maintenance-action-button" onclick="event.stopPropagation();" onmousedown="event.stopPropagation();">Go</button>
+                </form>
+              <?php elseif ($m['status'] === 'Ongoing'): ?>
+                <form method="post" class="d-inline" onclick="event.stopPropagation();" onmousedown="event.stopPropagation();"><?= csrf_field() ?><input type="hidden" name="action" value="complete"><input type="hidden" name="maintenance_id" value="<?= $m['maintenance_id'] ?>"><button type="submit" class="btn btn-sm btn-outline-maroon maintenance-action-button" onclick="event.stopPropagation();" onmousedown="event.stopPropagation();">Mark Completed</button></form>
+              <?php else: ?>
+                <span class="text-muted small"><?= $m['date_resolved'] ? clean(date('n/j/Y', strtotime($m['date_resolved']))) : '—' ?></span>
+              <?php endif; ?>
+            </div>
+          </td>
+        </tr>
+        <tr id="details-<?= $m['maintenance_id'] ?>" class="collapse expanded-detail-row">
+          <td colspan="6" class="expanded-drawer-td">
+            <div class="drawer-content-wrapper">
+            <div class="row g-3">
+              <div class="col-md-7">
+                <div class="detail-card mb-3">
+                <div class="section-title"><i class="bi bi-card-text me-2" aria-hidden="true"></i>Request Details</div>
+                <div class="detail-description">
+                  <div class="fw-semibold mb-1"><?= clean($m['issue_title']) ?></div>
+                  <div class="text-secondary detail-description-text"><?= nl2br(clean($m['issue_description'])) ?></div>
+                </div>
+                </div>
+                <div class="detail-card">
+                <div class="section-title"><i class="bi bi-info-circle me-2" aria-hidden="true"></i>Maintenance Metadata</div>
+                <div class="row g-2 detail-metadata">
+                  <div class="col-6"><div class="detail-label">Tenant</div><div class="detail-value"><?= clean($m['first_name'] . ' ' . $m['last_name']) ?></div></div>
+                  <div class="col-6"><div class="detail-label">Room / Unit</div><div class="detail-value">Room <?= clean($m['room_number']) ?></div></div>
+                  <div class="col-6"><div class="detail-label">Category</div><div class="detail-value"><?= clean(maintenance_category_bucket($m['issue_title'])) ?></div></div>
+                  <div class="col-6"><div class="detail-label">Priority</div><div class="detail-value"><?= clean($m['priority_level']) ?></div></div>
+                  <div class="col-6"><div class="detail-label">Status</div><div class="detail-value"><?= clean($m['status']) ?></div></div>
+                  <div class="col-6"><div class="detail-label">Assigned Team / Worker</div><div class="detail-value"><?= clean($m['assigned_to'] ?: 'Unassigned') ?></div></div>
+                  <div class="col-6"><div class="detail-label">Date Submitted</div><div class="detail-value"><?= clean(date('M j, Y g:i A', strtotime($m['date_submitted']))) ?></div></div>
+                  <div class="col-6"><div class="detail-label">Date Resolved</div><div class="detail-value"><?= $m['date_resolved'] ? clean(date('M j, Y', strtotime($m['date_resolved']))) : '—' ?></div></div>
+                </div>
+                </div>
+              </div>
+              <div class="col-md-5">
+                <div class="detail-card h-100">
+                <div class="section-title"><i class="bi bi-paperclip me-2" aria-hidden="true"></i>Attached Maintenance Photo</div>
+                <?php if (!empty($m['photo_file'])): ?>
+                  <div class="photo-preview-container">
+                    <a href="<?= BASE_URL . '/' . ltrim($m['photo_file'], '/') ?>" target="_blank" rel="noopener" class="d-block">
+                      <img src="<?= BASE_URL . '/' . ltrim($m['photo_file'], '/') ?>" alt="Tenant uploaded maintenance photo">
+                      <span class="photo-overlay-badge"><i class="bi bi-arrows-angle-expand me-1" aria-hidden="true"></i>View Full Photo</span>
+                    </a>
+                  </div>
+                <?php else: ?>
+                  <div class="text-center p-3 text-muted bg-light rounded-3">
+                    <i class="bi bi-image fs-2 d-block mb-1" aria-hidden="true"></i>
+                    <span>No photo uploaded for this request.</span>
+                  </div>
+                <?php endif; ?>
+                </div>
+              </div>
+            </div>
+            </div>
           </td>
         </tr>
       <?php endforeach; ?>
