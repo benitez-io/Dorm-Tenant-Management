@@ -2,8 +2,8 @@
 /**
  * webhooks/paymongo.php
  *
- * PayMongo calls this URL server-to-server when a GCash checkout is
- * paid (or fails). This is intentionally OUTSIDE config/ and
+ * PayMongo calls this URL server-to-server when a checkout (GCash,
+ * PayMaya or GoTyme/QR Ph) is paid (or fails). This is intentionally OUTSIDE config/ and
  * includes/ (which are locked down by .htaccess) because PayMongo's
  * servers need to reach it directly, with no login/session/CSRF —
  * none of that applies to a server-to-server callback.

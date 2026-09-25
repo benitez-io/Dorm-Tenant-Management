@@ -204,13 +204,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'verify_payment') {
         $paymentId = (int) ($_POST['payment_id'] ?? 0);
         $newStatus = $_POST['new_status'] ?? 'Paid';
-        $paymentRow = $db->prepare('SELECT tenant_id FROM payments WHERE payment_id = ?');
+        $paymentRow = $db->prepare('SELECT tenant_id, payment_status FROM payments WHERE payment_id = ?');
         $paymentRow->execute([$paymentId]);
-        $paymentTenantId = $paymentRow->fetch()['tenant_id'] ?? null;
-        $db->prepare('UPDATE payments SET payment_status = ?, payment_date = IF(? = "Paid", CURDATE(), payment_date) WHERE payment_id = ?')
-           ->execute([$newStatus, $newStatus, $paymentId]);
-        log_activity($db, 'payment_verified', 'Payment #' . $paymentId . ' marked as ' . $newStatus, $paymentTenantId);
-        flash('success', 'Payment marked as ' . $newStatus . '.');
+        $paymentRow = $paymentRow->fetch();
+        $paymentTenantId = $paymentRow['tenant_id'] ?? null;
+
+        // A Failed row is a checkout that never went through — no money
+        // actually came in, so it can't be promoted straight to Paid.
+        // Only a genuinely outstanding payment (Pending/Overdue) can be
+        // confirmed this way.
+        if (!$paymentRow) {
+            flash('error', 'That payment could not be found. Please refresh and try again.');
+        } elseif ($newStatus === 'Paid' && !in_array($paymentRow['payment_status'], ['Pending', 'Overdue'], true)) {
+            flash('error', 'That payment is ' . $paymentRow['payment_status'] . ' and can\'t be marked Paid directly. Record a new payment for the tenant instead if they paid in cash.');
+        } else {
+            $db->prepare('UPDATE payments SET payment_status = ?, payment_date = IF(? = "Paid", CURDATE(), payment_date) WHERE payment_id = ?')
+               ->execute([$newStatus, $newStatus, $paymentId]);
+            log_activity($db, 'payment_verified', 'Payment #' . $paymentId . ' marked as ' . $newStatus, $paymentTenantId);
+            flash('success', 'Payment marked as ' . $newStatus . '.');
+        }
     }
 
     redirect('/admin/payments.php');
@@ -387,10 +399,12 @@ render_module_tabs([
           </td>
           <td><span class="badge badge-<?= status_badge_class($p['payment_status']) ?>"><?= clean($p['payment_status']) ?></span></td>
           <td class="text-end">
-            <?php if ($p['payment_status'] !== 'Paid'): ?>
+            <?php if (in_array($p['payment_status'], ['Pending', 'Overdue'], true)): ?>
               <form method="post" class="d-inline"><?= csrf_field() ?><input type="hidden" name="action" value="verify_payment"><input type="hidden" name="payment_id" value="<?= $p['payment_id'] ?>"><input type="hidden" name="new_status" value="Paid"><button class="btn btn-sm btn-action-primary">Mark Paid</button></form>
-            <?php else: ?>
+            <?php elseif ($p['payment_status'] === 'Paid'): ?>
               <span class="text-muted small"><?= clean(date('n/j/Y', strtotime($p['payment_date']))) ?></span>
+            <?php else: ?>
+              <span class="text-muted small">— no action</span>
             <?php endif; ?>
           </td>
         </tr>

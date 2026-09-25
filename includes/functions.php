@@ -504,6 +504,100 @@ function tenant_rent_status(PDO $db, int $tenantId, ?array $contract = null): ar
  *
  * Returns the number of payments newly marked Paid.
  */
+function discard_gcash_checkout(PDO $db, array $payment): bool
+{
+    if (!paymongo_expire_checkout_session($payment['paymongo_checkout_id'])) {
+        return false;
+    }
+
+    $stmt = $db->prepare("DELETE FROM payments WHERE payment_id = ? AND payment_status = 'Pending'");
+    $stmt->execute([$payment['payment_id']]);
+
+    return $stmt->rowCount() > 0;
+}
+
+/**
+ * Ask PayMongo what a still-Pending online-checkout row (GCash, PayMaya
+ * or GoTyme) really is, and settle it.
+ *
+ * $discardAbandoned covers the one race that matters: the tenant might
+ * have the checkout open in another tab this very moment. Pass false
+ * for a checkout that's only seconds old; true once the tenant has told
+ * us they're finished with it — they cancelled out of it, or they're
+ * starting a fresh one for the same month.
+ *
+ * Returns the row if it still stands in the way of a new payment (it's
+ * Paid, or a real attempt is in flight), or null once it's been settled
+ * or cleared and the month is payable again.
+ */
+function settle_pending_gcash_payment(PDO $db, array $payment, bool $discardAbandoned = true): ?array
+{
+    // Not a GCash checkout at all — an admin-recorded payment, say —
+    // so there's nothing to ask PayMongo about and it stands as-is.
+    if (empty($payment['paymongo_checkout_id'])) {
+        return $payment;
+    }
+
+    try {
+        $session = paymongo_get_checkout_session($payment['paymongo_checkout_id']);
+        $result  = paymongo_checkout_payment_status($session);
+    } catch (Throwable $e) {
+        // Couldn't verify, so never throw the row away: leaving it
+        // Pending is always recoverable, deleting a payment that turns
+        // out to have been real is not.
+        error_log('GCash status check failed for payment ' . $payment['payment_id'] . ': ' . $e->getMessage());
+        return $payment;
+    }
+
+    if ($result['status'] === 'paid') {
+        // Same "don't double-process" guard the webhook uses, so
+        // whichever path gets there first wins and the other is a
+        // no-op instead of a second confirmation.
+        $db->prepare("
+            UPDATE payments
+               SET payment_status = 'Paid',
+                   payment_date = CURDATE(),
+                   paymongo_payment_id = COALESCE(paymongo_payment_id, ?)
+             WHERE payment_id = ? AND payment_status != 'Paid'
+        ")->execute([$result['payment_id'], $payment['payment_id']]);
+
+        $payment['payment_status'] = 'Paid';
+        return $payment;
+    }
+
+    if ($result['status'] === 'failed') {
+        // A real attempt that was declined is worth keeping a record
+        // of, but it no longer blocks paying the month again.
+        $db->prepare("UPDATE payments SET payment_status = 'Failed' WHERE payment_id = ? AND payment_status = 'Pending'")
+           ->execute([$payment['payment_id']]);
+        return null;
+    }
+
+    if ($result['status'] === 'abandoned' && $discardAbandoned && discard_gcash_checkout($db, $payment)) {
+        return null;
+    }
+
+    return $payment;
+}
+
+/**
+ * Settle this tenant's still-Pending online payments straight from
+ * PayMongo, so the portal updates itself.
+ *
+ * webhooks/paymongo.php remains the primary confirmation path, but it
+ * needs a publicly reachable URL — which a localhost XAMPP install
+ * doesn't have. This closes that gap by asking PayMongo about each
+ * open checkout the next time the tenant loads a page. It is
+ * deliberately conservative:
+ *   - only rows that actually went through PayMongo (a checkout id) and
+ *     are still 'Pending'
+ *   - only attempts from the last 24 hours, so old dead rows aren't
+ *     re-polled forever
+ *   - at most 3 lookups per request, and every failure is swallowed,
+ *     so a slow or unreachable PayMongo never blocks the page
+ *
+ * Returns the number of payments newly marked Paid.
+ */
 function sync_pending_gcash_payments(PDO $db, int $tenantId): int
 {
     static $seen = [];
@@ -512,8 +606,12 @@ function sync_pending_gcash_payments(PDO $db, int $tenantId): int
     }
     $seen[$tenantId] = true;
 
+    // Age is measured by MySQL rather than PHP: the two don't
+    // necessarily agree on the timezone, and comparing a stored
+    // timestamp against PHP's clock can put a row that was created
+    // seconds ago hours into the "future".
     $stmt = $db->prepare("
-        SELECT payment_id, paymongo_checkout_id
+        SELECT *, TIMESTAMPDIFF(SECOND, created_at, NOW()) AS age_seconds
         FROM payments
         WHERE tenant_id = ?
           AND payment_status = 'Pending'
@@ -523,34 +621,14 @@ function sync_pending_gcash_payments(PDO $db, int $tenantId): int
         LIMIT 3
     ");
     $stmt->execute([$tenantId]);
-    $openPayments = $stmt->fetchAll();
 
     $confirmed = 0;
-    foreach ($openPayments as $row) {
-        try {
-            $session = paymongo_get_checkout_session($row['paymongo_checkout_id']);
-            $result  = paymongo_checkout_payment_status($session);
-        } catch (Throwable $e) {
-            error_log('GCash status check failed for payment ' . $row['payment_id'] . ': ' . $e->getMessage());
-            continue;
-        }
-
-        if ($result['status'] === 'paid') {
-            // Same "don't double-process" guard the webhook uses, so
-            // whichever path gets there first wins and the other is a
-            // no-op instead of a second confirmation.
-            $updated = $db->prepare("
-                UPDATE payments
-                   SET payment_status = 'Paid',
-                       payment_date = CURDATE(),
-                       paymongo_payment_id = COALESCE(paymongo_payment_id, ?)
-                 WHERE payment_id = ? AND payment_status != 'Paid'
-            ");
-            $updated->execute([$result['payment_id'], $row['payment_id']]);
-            $confirmed += $updated->rowCount();
-        } elseif ($result['status'] === 'failed') {
-            $db->prepare("UPDATE payments SET payment_status = 'Failed' WHERE payment_id = ? AND payment_status = 'Pending'")
-               ->execute([$row['payment_id']]);
+    foreach ($stmt->fetchAll() as $row) {
+        // A minute's grace — this runs on every page load, and the
+        // tenant may still have that checkout open somewhere.
+        $settled = settle_pending_gcash_payment($db, $row, (int) $row['age_seconds'] >= 60);
+        if ($settled && $settled['payment_status'] === 'Paid') {
+            $confirmed++;
         }
     }
 

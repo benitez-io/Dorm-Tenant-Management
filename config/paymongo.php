@@ -2,7 +2,7 @@
 if (!defined('BASE_URL')) { http_response_code(403); exit('Direct access not permitted.'); }
 /**
  * config/paymongo.php
- * Credentials for the PayMongo GCash integration.
+ * Credentials for the PayMongo integration (GCash, PayMaya, GoTyme).
  *
  * Where to get these: PayMongo Dashboard -> Developers -> API Keys.
  *
@@ -24,8 +24,21 @@ if (!defined('BASE_URL')) { http_response_code(403); exit('Direct access not per
  */
 
 define('PAYMONGO_API_BASE', 'https://api.paymongo.com/v2');
-define('PAYMONGO_SECRET_KEY', '');
-define('PAYMONGO_PUBLIC_KEY', 'pk_test_vuoLy8CRZB4GQoZKWeMdGuCE');
+
+/**
+ * Which payment options tenants see on the Payments page.
+ * Choose from: 'gcash', 'paymaya', 'gotyme'.
+ *
+ * Each PayMongo account has its own list of activated payment methods
+ * (PayMongo Dashboard -> Settings -> Payment methods). If one of these
+ * isn't active on your account yet, remove it here and tenants won't
+ * be offered a button that would fail at checkout.
+ *
+ * 'gotyme' is paid through QR Ph — PayMongo has no separate GoTyme
+ * method, so it needs "QR Ph" active on your account. The tenant scans
+ * the QR code with the GoTyme app.
+ */
+define('PAYMONGO_ENABLED_METHODS', ['gcash', 'paymaya', 'gotyme']);
 
 // PayMongo Dashboard -> Developers -> Webhooks -> (your webhook) -> Signing secret.
 // Only needed once webhooks/paymongo.php is registered at a public URL
