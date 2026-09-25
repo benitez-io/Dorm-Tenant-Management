@@ -45,7 +45,8 @@ try {
     }
 
     $now = time();
-    $secondsLeft = $user['reset_otp_expires'] ? strtotime($user['reset_otp_expires']) - $now : 0;
+    $expiresAt = $user['reset_otp_expires_at'] ?? null;
+    $secondsLeft = $expiresAt ? strtotime($expiresAt) - $now : 0;
     if ($secondsLeft > 0 && $secondsLeft < 60) {
         http_response_code(429);
         echo json_encode(['success' => false, 'message' => 'Please wait a moment before requesting a new code.']);
@@ -59,8 +60,8 @@ try {
     $_SESSION['otp_last_sent_at'] = $now;
     $expires = date('Y-m-d H:i:s', $now + 10 * 60);
 
-    $update = get_db()->prepare('UPDATE users SET reset_otp = ?, reset_otp_expires = ? WHERE user_id = ?');
-    $updated = $update->execute([$otp, $expires, $user['user_id']]);
+    $update = get_db()->prepare('UPDATE users SET reset_otp_code = ?, reset_otp_created_at = ?, reset_otp_expires_at = ? WHERE user_id = ?');
+    $updated = $update->execute([$otp, date('Y-m-d H:i:s', $now), $expires, $user['user_id']]);
 
     if (!$updated) {
         error_log('[OTP resend] DB update failed for email: ' . $email);

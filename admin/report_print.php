@@ -37,7 +37,6 @@ $db->prepare('INSERT INTO reports (report_type, generated_by, period_start, peri
   th, td { border: 1px solid #dee2e6; padding: 8px 10px; text-align: left; }
   th { background: #f8f4f5; color: #800000; }
   tr:nth-child(even) { background: #fafafa; }
-  .print-btn { background:#800000; color:#fff; border:none; padding:.5rem 1.2rem; border-radius:6px; cursor:pointer; font-size:.9rem; }
   html { scrollbar-color: #800000 #f1f1f1; scrollbar-width: thin; }
   ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-track { background: #f1f1f1; }
@@ -57,7 +56,7 @@ $db->prepare('INSERT INTO reports (report_type, generated_by, period_start, peri
         <h1><?= SITE_NAME ?></h1>
         <p><?= $validTypes[$type] ?> Report · Generated <?= date('F j, Y g:i A') ?> · <?= count($rows) ?> record(s)</p>
       </div>
-      <button class="print-btn no-print" onclick="window.print()"><i class="bi bi-printer-fill"></i> Print</button>
+      <button class="btn btn-sm btn-action-primary no-print" onclick="window.print()"><i class="bi bi-printer-fill"></i> Print</button>
     </div>
 
     <?= render_report_table($columns, $rows) ?>

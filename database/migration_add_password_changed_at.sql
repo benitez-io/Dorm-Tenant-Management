@@ -20,4 +20,4 @@
 USE dorm_tenant_system;
 
 ALTER TABLE users
-  ADD COLUMN IF NOT EXISTS password_changed_at DATETIME DEFAULT NULL AFTER reset_otp_expires;
+  ADD COLUMN IF NOT EXISTS password_changed_at DATETIME DEFAULT NULL AFTER password_hash;

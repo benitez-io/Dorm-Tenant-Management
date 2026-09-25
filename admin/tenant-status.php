@@ -34,7 +34,7 @@ render_page_header(
     'bi-people-fill',
     'Tenant Status',
     'Review applications, track tenant status, and manage check-in/check-out.',
-    '<a href="' . BASE_URL . '/admin/users.php" class="btn btn-maroon"><i class="bi bi-plus-lg"></i> New Application</a>'
+    '<a href="' . BASE_URL . '/admin/users.php" class="btn btn-top-action"><i class="bi bi-plus-lg"></i> New Application</a>'
 );
 render_module_tabs([
   ['key' => 'registration', 'label' => 'Registration & Approval', 'href' => '/admin/tenants.php'],
@@ -54,7 +54,7 @@ render_module_tabs([
     <h2>All Tenants</h2>
     <?php if ($allTenants): ?>
     <div class="dropdown">
-      <button class="btn btn-sm btn-outline-maroon dropdown-toggle" type="button" data-bs-toggle="dropdown"><i class="bi bi-eraser-fill"></i> Clear</button>
+      <button class="btn btn-sm btn-action-outline dropdown-toggle" type="button" data-bs-toggle="dropdown"><i class="bi bi-eraser-fill"></i> Clear</button>
       <ul class="dropdown-menu dropdown-menu-end">
         <li><h6 class="dropdown-header">Clear from this view only</h6></li>
         <?php foreach (['Active', 'Pending', 'Checked Out', 'Evicted'] as $s): ?>
@@ -97,9 +97,9 @@ render_module_tabs([
           <td class="text-muted small"><?= clean($details) ?></td>
           <td class="text-end">
             <?php if ($t['status'] === 'Pending' && $t['room_id']): ?>
-              <form method="post" class="d-inline"><?= csrf_field() ?><input type="hidden" name="action" value="checkin"><input type="hidden" name="tenant_id" value="<?= $t['tenant_id'] ?>"><button class="btn btn-sm btn-maroon">Check In</button></form>
+              <form method="post" class="d-inline"><?= csrf_field() ?><input type="hidden" name="action" value="checkin"><input type="hidden" name="tenant_id" value="<?= $t['tenant_id'] ?>"><button class="btn btn-sm btn-action-primary d-inline-flex align-items-center justify-content-center">Check In</button></form>
             <?php elseif ($t['status'] === 'Active'): ?>
-              <form method="post" class="d-inline" onsubmit="return confirm('Check out this tenant?');"><?= csrf_field() ?><input type="hidden" name="action" value="checkout"><input type="hidden" name="tenant_id" value="<?= $t['tenant_id'] ?>"><button class="btn btn-sm btn-outline-maroon">Check Out</button></form>
+              <form method="post" class="d-inline" onsubmit="return confirm('Check out this tenant?');"><?= csrf_field() ?><input type="hidden" name="action" value="checkout"><input type="hidden" name="tenant_id" value="<?= $t['tenant_id'] ?>"><button class="btn btn-sm btn-action-outline d-inline-flex align-items-center justify-content-center">Check Out</button></form>
               <form method="post" class="d-inline" onsubmit="return confirm('Mark this tenant as evicted? This frees up their room.');"><?= csrf_field() ?><input type="hidden" name="action" value="evict"><input type="hidden" name="tenant_id" value="<?= $t['tenant_id'] ?>"><button class="btn btn-sm btn-outline-danger">Evict</button></form>
             <?php else: ?>
               <span class="text-muted small">—</span>

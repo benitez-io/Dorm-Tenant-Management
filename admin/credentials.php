@@ -13,13 +13,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $first = str_input($_POST, 'first_name');
         $last  = str_input($_POST, 'last_name');
         $email = str_input($_POST, 'email');
-        $role  = $_POST['role'] ?? 'tenant';
+        $role  = in_array($_POST['role'] ?? '', ['admin', 'maintenance_staff', 'tenant'], true) ? $_POST['role'] : 'tenant';
         $newPassword = str_input($_POST, 'new_password', '', false);
 
         if ($first === '' || $last === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             flash('error', 'Please fill every field correctly.');
-        } elseif ($newPassword !== '' && strlen($newPassword) < 8) {
-            flash('error', 'New password needs at least 8 characters — the rest of the update was not saved.');
+        } elseif ($newPassword !== '' && password_policy_error($newPassword) !== null) {
+          flash('error', password_policy_error($newPassword));
         } else {
             $dupe = $db->prepare('SELECT user_id FROM users WHERE email = ? AND user_id != ?');
             $dupe->execute([$email, $id]);
@@ -28,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 if ($newPassword !== '') {
                     $db->prepare('UPDATE users SET first_name=?, last_name=?, email=?, role=?, password_hash=? WHERE user_id=?')
-                       ->execute([$first, $last, $email, $role, password_hash($newPassword, PASSWORD_DEFAULT), $id]);
+                       ->execute([$first, $last, $email, $role, password_hash($newPassword, PASSWORD_BCRYPT), $id]);
                 } else {
                     $db->prepare('UPDATE users SET first_name=?, last_name=?, email=?, role=? WHERE user_id=?')
                        ->execute([$first, $last, $email, $role, $id]);
@@ -123,21 +123,21 @@ render_module_tabs([
             <td class="text-muted small"><?= $u['last_login'] ? clean(date('n/j/Y g:i A', strtotime($u['last_login']))) : 'Never' ?></td>
             <td><span class="badge badge-<?= $u['is_active'] ? 'success' : 'secondary' ?>"><?= $u['is_active'] ? 'Active' : 'Inactive' ?></span></td>
             <td class="text-end">
-              <button type="button" class="btn btn-icon" title="Edit" data-bs-toggle="modal" data-bs-target="#editUserModal"
+              <button type="button" class="btn btn-sm btn-icon btn-action-outline" title="Edit" data-bs-toggle="modal" data-bs-target="#editUserModal"
                 data-id="<?= $u['user_id'] ?>" data-first="<?= clean($u['first_name']) ?>" data-last="<?= clean($u['last_name']) ?>"
                 data-email="<?= clean($u['email']) ?>" data-role="<?= clean($u['role']) ?>"><i class="bi bi-pencil-square"></i></button>
               <form method="post" class="d-inline" onsubmit="return confirm('<?= $u['is_active'] ? 'Deactivate' : 'Reactivate' ?> this account?');">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="toggle_active">
                 <input type="hidden" name="user_id" value="<?= $u['user_id'] ?>">
-                <button class="btn btn-icon" title="<?= $u['is_active'] ? 'Deactivate' : 'Reactivate' ?>"><?= $u['is_active'] ? '<i class="bi bi-slash-circle"></i>' : '<i class="bi bi-check-circle-fill"></i>' ?></button>
+                <button class="btn btn-sm btn-icon btn-action-outline" title="<?= $u['is_active'] ? 'Deactivate' : 'Reactivate' ?>"><?= $u['is_active'] ? '<i class="bi bi-slash-circle"></i>' : '<i class="bi bi-check-circle-fill"></i>' ?></button>
               </form>
               <?php if ((int) $u['user_id'] !== current_user_id()): ?>
               <form method="post" class="d-inline" onsubmit="return confirm('Permanently delete this account? Its tenant records, payments, contracts, and maintenance history will also be deleted. This cannot be undone.');">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="delete">
                 <input type="hidden" name="user_id" value="<?= $u['user_id'] ?>">
-                <button class="btn btn-icon text-danger" title="Delete account" aria-label="Delete account"><i class="bi bi-trash3"></i></button>
+                <button class="btn btn-sm btn-icon btn-action-outline text-danger" title="Delete account" aria-label="Delete account"><i class="bi bi-trash3"></i></button>
               </form>
               <?php endif; ?>
             </td>
@@ -176,7 +176,7 @@ render_module_tabs([
             </select>
           </div>
         </div>
-        <div class="modal-footer"><button class="btn btn-light" data-bs-dismiss="modal" type="button">Cancel</button><button class="btn btn-maroon">Save Changes</button></div>
+        <div class="modal-footer"><button class="btn btn-sm btn-light" data-bs-dismiss="modal" type="button">Cancel</button><button class="btn btn-sm btn-action-primary">Save Changes</button></div>
       </form>
     </div>
   </div>
@@ -184,13 +184,26 @@ render_module_tabs([
 
 <?php
 $extraScripts = "<script>
-document.getElementById('editUserModal').addEventListener('show.bs.modal', function (e) {
-  const btn = e.relatedTarget;
-  document.getElementById('edit_user_id').value = btn.dataset.id;
-  document.getElementById('edit_first_name').value = btn.dataset.first;
-  document.getElementById('edit_last_name').value = btn.dataset.last;
-  document.getElementById('edit_email').value = btn.dataset.email;
-  document.getElementById('edit_role').value = btn.dataset.role;
+document.addEventListener('DOMContentLoaded', function () {
+  const modal = document.getElementById('editUserModal');
+  if (!modal) return;
+  modal.addEventListener('show.bs.modal', function (e) {
+    const btn = e.relatedTarget;
+    if (!btn) return;
+    const fields = {
+      userId: document.getElementById('edit_user_id'),
+      first: document.getElementById('edit_first_name'),
+      last: document.getElementById('edit_last_name'),
+      email: document.getElementById('edit_email'),
+      role: document.getElementById('edit_role')
+    };
+    if (!fields.userId || !fields.first || !fields.last || !fields.email || !fields.role) return;
+    fields.userId.value = btn.dataset.id || '';
+    fields.first.value = btn.dataset.first || '';
+    fields.last.value = btn.dataset.last || '';
+    fields.email.value = btn.dataset.email || '';
+    fields.role.value = btn.dataset.role || 'tenant';
+  });
 });
 </script>";
 include __DIR__ . '/../includes/footer.php';

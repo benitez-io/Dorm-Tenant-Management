@@ -71,7 +71,7 @@ include __DIR__ . '/../includes/header.php';
             </div>
           </div>
 
-          <button type="button" id="toggleEditBtn" class="btn btn-outline-maroon btn-sm px-3 py-1.5 rounded-pill fs-7 fw-semibold d-inline-flex align-items-center gap-1.5">
+          <button type="button" id="toggleEditBtn" class="btn btn-action-light">
             <i class="bi bi-pencil-square"></i>
             <span>Edit Profile</span>
           </button>
@@ -107,12 +107,12 @@ include __DIR__ . '/../includes/header.php';
         </div>
 
         <div id="saveProfileBar" class="d-none mt-3 text-end" style="max-width: 960px;">
-          <button type="button" id="cancelEditBtn" class="btn btn-light rounded-pill px-4 me-2">Cancel</button>
-          <button type="submit" class="btn btn-maroon rounded-pill px-4">Save Changes</button>
+          <button type="button" id="cancelEditBtn" class="btn btn-action-light rounded-pill px-4 me-2">Cancel</button>
+          <button type="submit" class="btn btn-sm btn-action-primary rounded-pill px-4">Save Changes</button>
         </div>
       </form>
 
-      <a href="<?= BASE_URL ?>/auth/logout.php" class="btn btn-maroon w-100 mt-4 mx-auto d-block" style="max-width: 960px;"><i class="bi bi-box-arrow-right"></i> Log Out</a>
+      <a href="<?= BASE_URL ?>/auth/logout.php" class="btn btn-sm btn-action-primary w-100 mt-4 mx-auto d-block" style="max-width: 960px;"><i class="bi bi-box-arrow-right"></i> Log Out</a>
     </div>
   </div>
 </div>

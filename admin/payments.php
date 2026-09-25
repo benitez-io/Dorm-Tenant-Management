@@ -321,8 +321,8 @@ $contractableTenants = $db->query("
 $activeContracts = array_filter($contracts, fn($c) => $c['contract_status'] !== 'Terminated');
 
 $headerActions = [
-    'payments'    => '<button type="button" class="btn btn-maroon" data-bs-toggle="modal" data-bs-target="#paymentModal"><i class="bi bi-plus-lg"></i> Record Payment</button>',
-    'contracts'   => '<button type="button" class="btn btn-maroon" data-bs-toggle="modal" data-bs-target="#contractModal"><i class="bi bi-upload"></i> Upload Contract</button>',
+    'payments'    => '<button type="button" class="btn btn-top-action" data-bs-toggle="modal" data-bs-target="#paymentModal"><i class="bi bi-plus-lg"></i> Record Payment</button>',
+    'contracts'   => '<button type="button" class="btn btn-top-action" data-bs-toggle="modal" data-bs-target="#contractModal"><i class="bi bi-upload"></i> Upload Contract</button>',
     'expirations' => null,
 ];
 
@@ -388,7 +388,7 @@ render_module_tabs([
           <td><span class="badge badge-<?= status_badge_class($p['payment_status']) ?>"><?= clean($p['payment_status']) ?></span></td>
           <td class="text-end">
             <?php if ($p['payment_status'] !== 'Paid'): ?>
-              <form method="post" class="d-inline"><?= csrf_field() ?><input type="hidden" name="action" value="verify_payment"><input type="hidden" name="payment_id" value="<?= $p['payment_id'] ?>"><input type="hidden" name="new_status" value="Paid"><button class="btn btn-sm btn-maroon">Mark Paid</button></form>
+              <form method="post" class="d-inline"><?= csrf_field() ?><input type="hidden" name="action" value="verify_payment"><input type="hidden" name="payment_id" value="<?= $p['payment_id'] ?>"><input type="hidden" name="new_status" value="Paid"><button class="btn btn-sm btn-action-primary">Mark Paid</button></form>
             <?php else: ?>
               <span class="text-muted small"><?= clean(date('n/j/Y', strtotime($p['payment_date']))) ?></span>
             <?php endif; ?>
@@ -454,7 +454,7 @@ render_module_tabs([
             </div>
             <?php if (!$isClosed): ?>
               <div class="contract-card-actions">
-                <button type="button" class="btn btn-sm <?= $isExpired || $isExpiring ? 'btn-maroon' : 'btn-outline-maroon' ?>"
+                <button type="button" class="btn btn-sm <?= $isExpired || $isExpiring ? 'btn-action-primary' : 'btn-action-outline' ?>"
                   data-bs-toggle="modal" data-bs-target="#renewContractModal"
                   data-id="<?= $c['contract_id'] ?>"
                   data-name="<?= clean($c['first_name'] . ' ' . $c['last_name']) ?>"
@@ -464,7 +464,7 @@ render_module_tabs([
                   data-base="<?= clean($renewFrom) ?>"
                   data-min="<?= clean(date('Y-m-d', strtotime($renewFrom . ' +1 day'))) ?>"
                   data-rent="<?= clean((string) $c['monthly_rent']) ?>"><i class="bi bi-arrow-repeat"></i> Renew Contract</button>
-                <button type="button" class="btn btn-sm btn-outline-danger"
+                <button type="button" class="btn btn-sm btn-action-outline"
                   data-bs-toggle="modal" data-bs-target="#terminateContractModal"
                   data-id="<?= $c['contract_id'] ?>"
                   data-name="<?= clean($c['first_name'] . ' ' . $c['last_name']) ?>"
@@ -542,7 +542,7 @@ render_module_tabs([
             </div>
           <?php endif; ?>
         </div>
-        <div class="modal-footer"><button class="btn btn-light" data-bs-dismiss="modal" type="button">Cancel</button><?php if ($contractableTenants): ?><button class="btn btn-maroon">Create Contract</button><?php endif; ?></div>
+        <div class="modal-footer"><button class="btn btn-light" data-bs-dismiss="modal" type="button">Cancel</button><?php if ($contractableTenants): ?><button class="btn btn-sm btn-action-primary">Create Contract</button><?php endif; ?></div>
       </form>
     </div>
   </div>
@@ -573,12 +573,12 @@ render_module_tabs([
           </div>
           <div class="quick-term-buttons mt-3">
             <span class="text-muted small me-1">Quick set:</span>
-            <button type="button" class="btn btn-sm btn-outline-maroon" data-months="3">+3 months</button>
-            <button type="button" class="btn btn-sm btn-outline-maroon" data-months="6">+6 months</button>
-            <button type="button" class="btn btn-sm btn-outline-maroon" data-months="12">+1 year</button>
+            <button type="button" class="btn btn-sm btn-action-outline" data-months="3">+3 months</button>
+            <button type="button" class="btn btn-sm btn-action-outline" data-months="6">+6 months</button>
+            <button type="button" class="btn btn-sm btn-action-outline" data-months="12">+1 year</button>
           </div>
         </div>
-        <div class="modal-footer"><button class="btn btn-light" data-bs-dismiss="modal" type="button">Cancel</button><button class="btn btn-maroon"><i class="bi bi-arrow-repeat"></i> Renew Contract</button></div>
+        <div class="modal-footer"><button class="btn btn-light" data-bs-dismiss="modal" type="button">Cancel</button><button class="btn btn-sm btn-action-primary w-100"><i class="bi bi-arrow-repeat"></i> Renew Contract</button></div>
       </form>
     </div>
   </div>
@@ -605,7 +605,7 @@ render_module_tabs([
             <div class="form-text">Leave this unticked if you're ending the lease only to replace it with a new contract.</div>
           </div>
         </div>
-        <div class="modal-footer"><button class="btn btn-light" data-bs-dismiss="modal" type="button">Cancel</button><button class="btn btn-maroon-primary"><i class="bi bi-x-octagon"></i> Terminate Contract</button></div>
+        <div class="modal-footer"><button class="btn btn-light" data-bs-dismiss="modal" type="button">Cancel</button><button class="btn btn-sm btn-action-outline w-100"><i class="bi bi-x-octagon"></i> Terminate Contract</button></div>
       </form>
     </div>
   </div>
@@ -650,7 +650,7 @@ render_module_tabs([
             </div>
           <?php endif; ?>
         </div>
-        <div class="modal-footer"><button class="btn btn-light" data-bs-dismiss="modal" type="button">Cancel</button><?php if ($activeContracts): ?><button class="btn btn-maroon">Record Payment</button><?php endif; ?></div>
+        <div class="modal-footer"><button class="btn btn-light" data-bs-dismiss="modal" type="button">Cancel</button><?php if ($activeContracts): ?><button class="btn btn-sm btn-action-primary">Record Payment</button><?php endif; ?></div>
       </form>
     </div>
   </div>

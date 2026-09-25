@@ -7,6 +7,11 @@ if (is_logged_in()) {
 
 $sent = false;
 $oldEmail = '';
+$step = (string) ($_GET['step'] ?? '1');
+
+if ($step === '2' && !empty($_SESSION['reset_email'])) {
+  redirect('/auth/reset_password.php?step=2&email=' . urlencode((string) $_SESSION['reset_email']));
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
@@ -21,19 +26,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($user) {
             // Don't spam a fresh code if one was already sent in the last minute
             // (a full code is valid for 15 minutes, so >14 left means <1 minute old).
-            $secondsLeft = $user['reset_otp_expires'] ? strtotime($user['reset_otp_expires']) - time() : 0;
+            $expiresAt = $user['reset_otp_expires_at'] ?? null;
+            $secondsLeft = $expiresAt ? strtotime($expiresAt) - time() : 0;
             if ($secondsLeft <= 14 * 60) {
                 $otp = (string) random_int(100000, 999999);
                 $_SESSION['demo_otp'] = $otp;
                 $_SESSION['reset_email'] = $email;
                 $_SESSION['otp_last_sent_at'] = time();
                 $expires = date('Y-m-d H:i:s', time() + 15 * 60);
-                get_db()->prepare('UPDATE users SET reset_otp = ?, reset_otp_expires = ? WHERE user_id = ?')
+                get_db()->prepare('UPDATE users SET reset_otp_code = ?, reset_otp_expires_at = ? WHERE user_id = ?')
                         ->execute([$otp, $expires, $user['user_id']]);
 
                 $body = "Hi {$user['first_name']}, use this code to reset your password:\n\n{$otp}\n\nThis code expires in 15 minutes. If you didn't request this, you can safely ignore this email.";
                 if (!send_email_alert($user['email'], $user['first_name'], 'Your password reset code', email_template('Reset your password', $body))) {
-                  get_db()->prepare('UPDATE users SET reset_otp = NULL, reset_otp_expires = NULL WHERE user_id = ?')->execute([$user['user_id']]);
+                  get_db()->prepare('UPDATE users SET reset_otp_code = NULL, reset_otp_expires_at = NULL WHERE user_id = ?')->execute([$user['user_id']]);
                   flash('error', 'We could not send the verification email. Please try again later.');
                   $sent = false;
                   goto render_forgot_password;
@@ -82,7 +88,7 @@ include __DIR__ . '/../includes/header.php';
           <i class="bi bi-check-circle-fill"></i>
           <div>Verification code sent. It expires in 15 minutes.</div>
         </div>
-        <a href="<?= BASE_URL ?>/auth/reset_password.php?email=<?= urlencode($oldEmail) ?>" class="btn btn-primary-cta w-100 py-2.5 rounded-pill fw-bold">Enter Verification Code</a>
+        <a href="<?= BASE_URL ?>/auth/reset_password.php?step=2&amp;email=<?= urlencode($oldEmail) ?>" id="enterVerificationCodeBtn" class="btn btn-primary-cta w-100 py-2.5 rounded-pill fw-bold">Enter Verification Code</a>
       <?php else: ?>
         <div class="callout callout-info">
           <i class="bi bi-info-circle-fill"></i>

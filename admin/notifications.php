@@ -119,7 +119,7 @@ require_once __DIR__ . '/../includes/module_tabs.php';
           <label class="form-label">Preview</label>
           <div class="preview-box" id="previewBox">Your message will appear here…</div>
         </div>
-        <button class="btn btn-maroon w-100"><i class="bi bi-send-fill"></i> Send Notification</button>
+        <button class="btn btn-action-primary w-100"><i class="bi bi-send-fill"></i> Send Notification</button>
       </form>
     </div>
   </div>

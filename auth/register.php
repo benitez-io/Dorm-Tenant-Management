@@ -195,6 +195,19 @@ include __DIR__ . '/../includes/header.php';
             <span id="requirements-counter" class="strength-count requirements-met-text" aria-live="polite">0/5 requirements met</span>
           </div>
         </div>
+        <div class="requirements-box p-3 rounded-3 bg-light mb-3" aria-label="Password requirements">
+          <div class="row g-2">
+            <div class="col-6">
+              <div class="req-item text-muted xxs-text d-flex align-items-center gap-2" id="req-length" data-req="length"><i class="bi bi-circle req-icon"></i><span>At least 8 characters</span></div>
+              <div class="req-item text-muted xxs-text d-flex align-items-center gap-2 mt-2" id="req-lower" data-req="lowercase"><i class="bi bi-circle req-icon"></i><span>Lowercase letter (a-z)</span></div>
+              <div class="req-item text-muted xxs-text d-flex align-items-center gap-2 mt-2" id="req-special" data-req="special"><i class="bi bi-circle req-icon"></i><span>Special character (@!#...)</span></div>
+            </div>
+            <div class="col-6">
+              <div class="req-item text-muted xxs-text d-flex align-items-center gap-2" id="req-upper" data-req="uppercase"><i class="bi bi-circle req-icon"></i><span>Uppercase letter (A-Z)</span></div>
+              <div class="req-item text-muted xxs-text d-flex align-items-center gap-2 mt-2" id="req-number" data-req="number"><i class="bi bi-circle req-icon"></i><span>Number (0-9)</span></div>
+            </div>
+          </div>
+        </div>
         <hr class="my-3">
         <p class="text-muted small mb-2">Emergency contact (optional, but recommended)</p>
         <div class="row g-3">
@@ -217,6 +230,8 @@ include __DIR__ . '/../includes/header.php';
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   const passwordInput = document.getElementById('password') || document.querySelector('input[name="password"]');
+  const confirmInput = document.getElementById('confirm_password') || document.querySelector('input[name="confirm_password"]');
+  const registerForm = document.getElementById('registerForm');
   const bars = document.querySelectorAll('.strength-bar');
   const strengthText = document.getElementById('strength-label');
   const counterText = document.getElementById('requirements-counter');
@@ -265,6 +280,25 @@ document.addEventListener('DOMContentLoaded', () => {
           bar.classList.remove('active-maroon');
         }
       });
+    });
+  }
+
+  if (registerForm && passwordInput && confirmInput) {
+    registerForm.addEventListener('submit', (event) => {
+      const value = passwordInput.value || '';
+      const checks = [
+        value.length >= 8,
+        /[A-Z]/.test(value),
+        /[a-z]/.test(value),
+        /[0-9]/.test(value),
+        /[^A-Za-z0-9]/.test(value)
+      ];
+      const valid = checks.every(Boolean) && value === confirmInput.value;
+      if (!valid) {
+        event.preventDefault();
+        registerForm.classList.add('was-validated');
+        passwordInput.focus();
+      }
     });
   }
 });

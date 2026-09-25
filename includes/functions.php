@@ -93,9 +93,9 @@ function pagination_links(int $page, int $totalPages): string
     $nextHref = clean('?' . http_build_query($params));
 
     return '<nav class="d-flex justify-content-between align-items-center mt-3">'
-         . '<a class="btn btn-sm btn-outline-maroon' . $prevClass . '" href="' . $prevHref . '"><i class="bi bi-chevron-left"></i> Previous</a>'
+         . '<a class="btn btn-sm btn-action-outline' . $prevClass . '" href="' . $prevHref . '"><i class="bi bi-chevron-left"></i> Previous</a>'
          . '<span class="text-muted small">Page ' . $page . ' of ' . $totalPages . '</span>'
-         . '<a class="btn btn-sm btn-outline-maroon' . $nextClass . '" href="' . $nextHref . '">Next <i class="bi bi-chevron-right"></i></a>'
+         . '<a class="btn btn-sm btn-action-outline' . $nextClass . '" href="' . $nextHref . '">Next <i class="bi bi-chevron-right"></i></a>'
          . '</nav>';
 }
 

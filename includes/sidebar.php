@@ -30,6 +30,7 @@ $tenantLinks = [
     ['<i class="bi bi-file-earmark-text"></i>', 'Services', '/tenant/services.php'],
     ['<i class="bi bi-credit-card-fill"></i>', 'Payments', '/tenant/payments.php'],
     ['<i class="bi bi-tools"></i>', 'Maintenance', '/tenant/maintenance.php'],
+    ['<i class="bi bi-bell-fill"></i>', 'Notifications', '/tenant/notifications.php'],
     ['<i class="bi bi-person-fill"></i>', 'Profile', '/tenant/profile.php'],
 ];
 ?>
@@ -65,12 +66,12 @@ $tenantLinks = [
         }
         if (isset($sectionLabels[$index])): ?><div class="sidebar-section"><?= clean($sectionLabels[$index]) ?></div><?php endif;
     ?>
-      <a class="sidebar-link <?= $moduleActive ? 'active' : '' ?>" href="<?= BASE_URL . $page ?>"><span class="nav-icon"><?= $icon ?></span> <?= clean($label) ?></a>
+      <a class="sidebar-link <?= $moduleActive ? 'active' : '' ?>" href="<?= BASE_URL . $page ?>"><span class="nav-icon"><?= $icon ?></span> <?= clean($label) ?><?php if ($label === 'Tenant Management'): ?><span class="nav-unread-badge hidden" id="nav-badge-tenants" data-badge-type="badge-tenants" data-endpoint="<?= BASE_URL ?>/api/get_unread_notifications.php" aria-label="Pending tenants">0</span><?php elseif ($label === 'Payments & Contracts'): ?><span class="nav-unread-badge hidden" id="nav-badge-payments" data-badge-type="badge-payments" data-endpoint="<?= BASE_URL ?>/api/get_unread_notifications.php" aria-label="Pending payments">0</span><?php elseif ($label === 'Maintenance'): ?><span class="nav-unread-badge hidden" id="nav-badge-maintenance" data-badge-type="badge-maintenance" data-endpoint="<?= BASE_URL ?>/api/get_unread_notifications.php" aria-label="Pending maintenance">0</span><?php elseif ($label === 'Notifications'): ?><span class="nav-unread-dot hidden" id="nav-dot-notifications" data-badge-type="dot-notifications" aria-hidden="true"></span><span class="nav-unread-badge hidden" id="nav-badge-notifications" data-badge-type="badge-notifications" data-endpoint="<?= BASE_URL ?>/api/get_unread_notifications.php" aria-label="Unread notifications">0</span><?php endif; ?></a>
     <?php endforeach; ?>
 
   <?php elseif ($role === 'tenant'): ?>
     <?php foreach ($tenantLinks as [$icon, $label, $page]): ?>
-      <a class="sidebar-link <?= active($page) ?>" href="<?= BASE_URL . $page ?>"><span class="nav-icon"><?= $icon ?></span> <?= clean($label) ?></a>
+      <a class="sidebar-link <?= active($page) ?>" href="<?= BASE_URL . $page ?>"><span class="nav-icon"><?= $icon ?></span> <?= clean($label) ?><?php if ($label === 'Payments'): ?><span class="nav-unread-badge hidden" id="nav-badge-payments" data-badge-type="badge-payments" data-endpoint="<?= BASE_URL ?>/api/get_unread_notifications.php" aria-label="Pending payments">0</span><?php elseif ($label === 'Maintenance'): ?><span class="nav-unread-badge hidden" id="nav-badge-maintenance" data-badge-type="badge-maintenance" data-endpoint="<?= BASE_URL ?>/api/get_unread_notifications.php" aria-label="Pending maintenance">0</span><?php elseif ($label === 'Notifications'): ?><span class="nav-unread-dot hidden" id="nav-dot-notifications" data-badge-type="dot-notifications" aria-hidden="true"></span><span class="nav-unread-badge hidden" id="nav-badge-notifications" data-badge-type="badge-notifications" data-endpoint="<?= BASE_URL ?>/api/get_unread_notifications.php" aria-label="Unread notifications">0</span><?php endif; ?></a>
     <?php endforeach; ?>
   <?php endif; ?>
   </div>

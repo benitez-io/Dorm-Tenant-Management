@@ -105,7 +105,7 @@ render_module_tabs([
             <td><?= $t['room_number'] ? 'Room ' . clean($t['room_number']) : '<span class="text-muted">Unassigned</span>' ?></td>
             <td><span class="badge badge-<?= $t['is_active'] ? status_badge_class($t['status']) : 'secondary' ?>"><?= $t['is_active'] ? clean($t['status']) : 'Deactivated' ?></span></td>
             <td class="text-end">
-              <button type="button" class="btn btn-icon" title="Edit" data-bs-toggle="modal" data-bs-target="#editTenantModal"
+              <button type="button" class="btn btn-sm btn-icon btn-action-outline" title="Edit" data-bs-toggle="modal" data-bs-target="#editTenantModal"
                 data-id="<?= $t['tenant_id'] ?>" data-first="<?= clean($t['first_name']) ?>" data-last="<?= clean($t['last_name']) ?>"
                 data-phone="<?= clean($t['phone'] ?? '') ?>" data-room="<?= $t['room_number'] ? 'Room ' . clean($t['room_number']) : 'Unassigned' ?>"
                 data-status="<?= clean($t['status']) ?>" data-type="<?= clean($t['tenant_type']) ?>"><i class="bi bi-pencil-square"></i></button>
@@ -114,7 +114,7 @@ render_module_tabs([
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="deactivate">
                 <input type="hidden" name="tenant_id" value="<?= $t['tenant_id'] ?>">
-                <button class="btn btn-icon" title="Deactivate"><i class="bi bi-trash"></i></button>
+                <button class="btn btn-sm btn-icon btn-action-outline" title="Deactivate"><i class="bi bi-trash"></i></button>
               </form>
               <?php endif; ?>
             </td>
@@ -150,7 +150,7 @@ render_module_tabs([
           <div class="mb-1"><label class="form-label">Status</label><input class="form-control" id="et_status" disabled></div>
           <p class="text-muted small mt-2 mb-0">Room assignment and status changes happen in <a href="<?= BASE_URL ?>/admin/rooms.php">Property Management</a> and <a href="<?= BASE_URL ?>/admin/tenant-status.php">Track Status</a>, to keep room availability in sync.</p>
         </div>
-        <div class="modal-footer"><button class="btn btn-light" data-bs-dismiss="modal" type="button">Cancel</button><button class="btn btn-maroon">Save Changes</button></div>
+        <div class="modal-footer"><button class="btn btn-sm btn-light" data-bs-dismiss="modal" type="button">Cancel</button><button class="btn btn-sm btn-action-primary">Save Changes</button></div>
       </form>
     </div>
   </div>

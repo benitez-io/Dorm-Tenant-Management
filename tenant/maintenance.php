@@ -20,7 +20,7 @@ include __DIR__ . '/../includes/header.php';
 ?>
 <div class="page-header"><div><h1>Maintenance Requests</h1><p class="text-muted">Submit and track repair requests for your room.</p></div></div>
 
-<button type="button" class="btn btn-maroon w-100 mb-3" data-bs-toggle="collapse" data-bs-target="#newRequestForm">+ New Maintenance Request</button>
+<button type="button" class="btn btn-sm btn-action-primary mb-3" data-bs-toggle="collapse" data-bs-target="#newRequestForm">+ New Maintenance Request</button>
 
 <div class="collapse mb-3" id="newRequestForm">
   <div class="panel">
@@ -48,8 +48,8 @@ include __DIR__ . '/../includes/header.php';
           <div>Take a photo or choose a file</div>
           <small class="dz-hint text-muted">Supports JPG, PNG up to 5MB</small>
           <div class="d-flex justify-content-center gap-2 mt-3 flex-wrap">
-            <button type="button" class="btn btn-maroon-primary btn-sm rounded-pill photo-trigger" data-input="cameraInput">Take Photo</button>
-            <button type="button" class="btn btn-outline-maroon btn-sm rounded-pill photo-trigger" data-input="fileInput">Upload Image File</button>
+            <button type="button" class="btn btn-action-light rounded-pill photo-trigger" data-input="cameraInput">Take Photo</button>
+            <button type="button" class="btn btn-action-light rounded-pill photo-trigger" data-input="fileInput">Upload Image File</button>
             <input type="file" id="cameraInput" name="camera_photo" accept="image/*" capture="environment" class="d-none">
             <input type="file" id="fileInput" name="maintenance_photo" accept="image/*" class="d-none">
           </div>
@@ -65,8 +65,8 @@ include __DIR__ . '/../includes/header.php';
         </div>
       </div>
       <div class="d-flex gap-2">
-        <button class="btn btn-maroon-primary rounded-pill flex-grow-1">Submit Request</button>
-        <button type="button" class="btn btn-light rounded-pill" data-bs-toggle="collapse" data-bs-target="#newRequestForm">Cancel</button>
+        <button class="btn btn-sm btn-action-primary rounded-pill flex-grow-1">Submit Request</button>
+        <button type="button" class="btn btn-action-light rounded-pill" data-bs-toggle="collapse" data-bs-target="#newRequestForm">Cancel</button>
       </div>
     </form>
   </div>
@@ -85,8 +85,8 @@ include __DIR__ . '/../includes/header.php';
         <p id="maintenanceCameraStatus" class="small text-muted mt-2 mb-0">Allow camera access to take a photo.</p>
       </div>
       <div class="modal-footer">
-        <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-maroon-primary" id="captureMaintenancePhoto"><i class="bi bi-camera-fill"></i> Capture Photo</button>
+          <button type="button" class="btn btn-action-light" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-sm btn-action-primary" id="captureMaintenancePhoto"><i class="bi bi-camera-fill"></i> Capture Photo</button>
       </div>
     </div>
   </div>
@@ -109,7 +109,7 @@ include __DIR__ . '/../includes/header.php';
       <?php if ($r['assigned_to']): ?><div class="small mb-2">Assigned to: <?= clean($r['assigned_to']) ?></div><?php endif; ?>
       <?php if (!empty($r['photo_file'])): ?>
         <div class="mb-2">
-          <button type="button" class="btn btn-outline-maroon btn-sm rounded-pill maintenance-photo-trigger" data-image="<?= BASE_URL . '/' . ltrim($r['photo_file'], '/') ?>" data-title="<?= clean($r['issue_title']) ?>">
+          <button type="button" class="btn btn-action-light rounded-pill maintenance-photo-trigger" data-image="<?= BASE_URL . '/' . ltrim($r['photo_file'], '/') ?>" data-title="<?= clean($r['issue_title']) ?>">
             <i class="bi bi-image"></i> View Photo
           </button>
         </div>

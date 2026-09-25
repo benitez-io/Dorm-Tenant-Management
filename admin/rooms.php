@@ -116,7 +116,7 @@ render_page_header(
     'bi-door-open-fill',
     'Property Management',
     'Manage dorm rooms, assign tenants, and monitor availability.',
-    '<button type="button" class="btn btn-maroon" data-bs-toggle="modal" data-bs-target="#roomModal"><i class="bi bi-plus-lg"></i> Add Room</button>'
+    '<button type="button" class="btn btn-top-action" data-bs-toggle="modal" data-bs-target="#roomModal"><i class="bi bi-plus-lg"></i> Add Room</button>'
 );
 render_module_tabs([
   ['key' => 'rooms', 'label' => 'Room Inventory', 'href' => '/admin/rooms.php?tab=rooms#rooms'],
@@ -163,10 +163,10 @@ render_module_tabs([
       <?php endif; ?>
       <div class="room-card-actions">
         <?php if ($isAssignMode): ?>
-        <button type="button" class="btn btn-full btn-assign btn-maroon" data-bs-toggle="modal" data-bs-target="#assignModal"
+        <button type="button" class="btn btn-sm btn-action-outline w-100" data-bs-toggle="modal" data-bs-target="#assignModal"
           data-room-id="<?= $r['room_id'] ?>" data-room-number="<?= clean($r['room_number']) ?>">Assign Tenant</button>
         <?php else: ?>
-        <button type="button" class="btn btn-full btn-edit btn-outline-maroon edit-room-btn" data-bs-toggle="modal" data-bs-target="#roomModal"
+        <button type="button" class="btn btn-sm btn-action-outline edit-room-btn" data-bs-toggle="modal" data-bs-target="#roomModal"
           data-id="<?= $r['room_id'] ?>" data-number="<?= clean($r['room_number']) ?>" data-type="<?= clean($r['room_type']) ?>"
           data-capacity="<?= (int) $r['capacity'] ?>" data-rate="<?= clean((string) $r['monthly_rate']) ?>" data-floor="<?= (int) $r['floor_number'] ?>"
           data-description="<?= clean($r['description'] ?? '') ?>">Edit</button>
@@ -273,7 +273,7 @@ render_module_tabs([
           </div>
           <div class="mb-1 mt-3"><label class="form-label">Description</label><textarea class="form-control" name="description" id="description" rows="2"></textarea></div>
         </div>
-        <div class="modal-footer"><button class="btn btn-light" data-bs-dismiss="modal" type="button">Cancel</button><button class="btn btn-maroon">Save Room</button></div>
+        <div class="modal-footer"><button class="btn btn-light" data-bs-dismiss="modal" type="button">Cancel</button><button class="btn btn-sm btn-action-primary">Save Room</button></div>
       </form>
     </div>
   </div>
@@ -303,7 +303,7 @@ render_module_tabs([
         </div>
         <div class="modal-footer">
           <button class="btn btn-light" data-bs-dismiss="modal" type="button">Cancel</button>
-          <?php if ($unassignedTenants): ?><button class="btn btn-maroon">Assign Tenant</button><?php endif; ?>
+          <?php if ($unassignedTenants): ?><button class="btn btn-sm btn-action-primary">Assign Tenant</button><?php endif; ?>
         </div>
       </form>
     </div>

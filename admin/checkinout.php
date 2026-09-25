@@ -32,7 +32,7 @@ render_page_header(
     'bi-box-arrow-in-right',
     'Check-In / Check-Out',
     'Review applications, track tenant status, and manage check-in/check-out.',
-    '<a href="' . BASE_URL . '/admin/users.php" class="btn btn-maroon"><i class="bi bi-plus-lg"></i> New Application</a>'
+    '<a href="' . BASE_URL . '/admin/users.php" class="btn btn-top-action"><i class="bi bi-plus-lg"></i> New Application</a>'
 );
 render_module_tabs([
   ['key' => 'registration', 'label' => 'Registration & Approval', 'href' => '/admin/tenants.php'],
@@ -51,7 +51,7 @@ render_module_tabs([
     <h2>All Records</h2>
     <?php if ($records): ?>
     <div class="dropdown">
-      <button class="btn btn-sm btn-outline-maroon dropdown-toggle" type="button" data-bs-toggle="dropdown"><i class="bi bi-eraser-fill"></i> Clear</button>
+      <button class="btn btn-sm btn-action-outline dropdown-toggle" type="button" data-bs-toggle="dropdown"><i class="bi bi-eraser-fill"></i> Clear</button>
       <ul class="dropdown-menu dropdown-menu-end">
         <li><h6 class="dropdown-header">Clear from this view only</h6></li>
         <li><form method="post" onsubmit="return confirm('Clear Checked In records from this view? They stay in the database for reports.');"><?= csrf_field() ?><input type="hidden" name="action" value="clear_view"><input type="hidden" name="page" value="checkinout"><input type="hidden" name="filter" value="Active"><button class="dropdown-item" type="submit">Clear Checked In only</button></form></li>
@@ -95,14 +95,14 @@ render_module_tabs([
                 <input type="hidden" name="action" value="checkout">
                 <input type="hidden" name="tenant_id" value="<?= $t['tenant_id'] ?>">
                 <label class="small text-muted me-1"><input type="checkbox" name="keys_returned" checked> Keys returned</label>
-                <button class="btn btn-sm btn-outline-maroon">Check Out</button>
+                <button class="btn btn-sm btn-action-outline d-inline-flex align-items-center justify-content-center">Check Out</button>
               </form>
             <?php elseif (!$t['key_returned']): ?>
               <form method="post" class="d-inline">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="mark_key_returned">
                 <input type="hidden" name="tenant_id" value="<?= $t['tenant_id'] ?>">
-                <button class="btn btn-sm btn-outline-maroon">Mark Key Returned</button>
+                <button class="btn btn-sm btn-action-outline d-inline-flex align-items-center justify-content-center">Mark Key Returned</button>
               </form>
             <?php else: ?>
               <span class="text-muted small">—</span>

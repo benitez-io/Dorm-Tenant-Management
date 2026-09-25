@@ -137,7 +137,7 @@ $rentPaid = $rent['state'] === 'Paid';
   <div class="rent-status-side">
     <span class="rent-status-pill"><span class="rent-status-dot"></span><?= clean($rent['label']) ?></span>
     <?php if (in_array($rent['state'], ['Due', 'Overdue'], true)): ?>
-      <a href="<?= BASE_URL ?>/tenant/payments.php" class="btn btn-sm btn-maroon"><i class="bi bi-phone"></i> Pay Now</a>
+      <a href="<?= BASE_URL ?>/tenant/payments.php" class="btn btn-sm btn-action-primary"><i class="bi bi-phone"></i> Pay Now</a>
     <?php endif; ?>
   </div>
 </div>

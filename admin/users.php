@@ -16,7 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $password = str_input($_POST, 'password', '', false);
         $confirmPassword = str_input($_POST, 'confirm_password', '', false);
         $requestedRole = $_POST['role'] ?? '';
-        $role = $requestedRole === 'admin' ? 'admin' : 'tenant';
+        $role = in_array($requestedRole, ['admin', 'maintenance_staff', 'tenant'], true) ? $requestedRole : 'tenant';
         $contactNumber = str_input($_POST, 'contact_number');
         $emergencyName = str_input($_POST, 'emergency_contact_name');
         $emergencyPhone = str_input($_POST, 'emergency_contact_phone');
@@ -30,7 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 flash('error', 'That email is already registered.');
             } else {
                  $db->prepare('INSERT INTO users (first_name, last_name, email, password_hash, phone, role) VALUES (?, ?, ?, ?, ?, ?)')
-                   ->execute([$first, $last, $email, password_hash($password, PASSWORD_DEFAULT), preg_replace('/\D+/', '', $contactNumber), $role]);
+                   ->execute([$first, $last, $email, password_hash($password, PASSWORD_BCRYPT), preg_replace('/\D+/', '', $contactNumber), $role]);
                  $newId = (int) $db->lastInsertId();
                  if ($role === 'tenant') {
                      $cleanPhone = preg_replace('/\D+/', '', $contactNumber);
@@ -91,7 +91,7 @@ render_module_tabs([
         <div class="mb-3"><label class="form-label">User Category</label><select name="category" class="form-select"><option value="" disabled selected>Select category...</option><option value="student">Student / Resident</option><option value="staff">Administrative Staff</option></select></div>
         <div class="mb-3"><label class="form-label">Emergency Contact Name</label><input class="form-control" name="emergency_contact_name" placeholder="Full name"></div>
         <div class="mb-3"><label class="form-label">Emergency Contact Phone</label><input type="tel" class="form-control" name="emergency_contact_phone" pattern="[0-9+() .-]{7,20}" placeholder="+63 XXX XXX XXXX"></div>
-        <button class="btn btn-maroon w-100 rounded-pill fw-bold">Save User</button>
+        <button class="btn btn-sm btn-action-primary w-100 rounded-pill fw-bold">Save User</button>
       </section>
       <section class="registration-card role-selection-card">
         <div class="registration-card-heading"><span class="registration-icon"><i class="bi bi-shield-check"></i></span><h5>Identify Role</h5></div>

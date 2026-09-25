@@ -112,7 +112,7 @@ render_page_header(
     'bi-people-fill',
     'Tenant Registration',
     'Review applications, track tenant status, and manage check-in/check-out.',
-    '<a href="' . BASE_URL . '/admin/users.php" class="btn btn-maroon"><i class="bi bi-plus-lg"></i> New Application</a>'
+    '<a href="' . BASE_URL . '/admin/users.php" class="btn btn-top-action"><i class="bi bi-plus-lg"></i> New Application</a>'
 );
 render_module_tabs([
   ['key' => 'registration', 'label' => 'Registration & Approval', 'href' => '/admin/tenants.php'],
@@ -177,13 +177,15 @@ $statusPills = [
           <td class="text-muted small"><i class="bi bi-calendar-event"></i> <?= clean(date('n/j/Y', strtotime($p['date_registered']))) ?></td>
           <td><span class="badge badge-<?= status_badge_class($p['approval_status']) ?>"><?= clean($p['approval_status']) ?></span></td>
           <td class="text-end">
-            <div class="applicant-actions">
+            <div class="d-flex justify-content-end gap-2 flex-wrap align-items-center">
             <?php if ($status === 'pending'): ?>
-              <form method="post"><?= csrf_field() ?><input type="hidden" name="action" value="approve"><input type="hidden" name="tenant_id" value="<?= $p['tenant_id'] ?>"><button class="btn applicant-action applicant-action-approve"><i class="bi bi-check-lg"></i> Approve</button></form>
-              <button type="button" class="btn applicant-action applicant-action-reject reject-btn" data-bs-toggle="modal" data-bs-target="#rejectModal"
-                data-id="<?= $p['tenant_id'] ?>" data-name="<?= clean($p['first_name']) ?>"><i class="bi bi-x-lg"></i> Reject</button>
+              <div class="d-flex gap-2 align-items-center">
+                <form method="post"><?= csrf_field() ?><input type="hidden" name="action" value="approve"><input type="hidden" name="tenant_id" value="<?= $p['tenant_id'] ?>"><button class="btn btn-action-approve"><i class="bi bi-check-lg"></i> Approve</button></form>
+                <button type="button" class="btn btn-action-reject" data-bs-toggle="modal" data-bs-target="#rejectModal"
+                  data-id="<?= $p['tenant_id'] ?>" data-name="<?= clean($p['first_name']) ?>"><i class="bi bi-x-lg"></i> Reject</button>
+              </div>
             <?php elseif ($status === 'approved' && empty($p['room_id'])): ?>
-              <a href="<?= BASE_URL ?>/admin/rooms.php?tenant=<?= $p['tenant_id'] ?>&tab=assign#rooms" class="btn applicant-action btn-assign-room"><i class="bi bi-door-open"></i> Assign Room</a>
+              <a href="<?= BASE_URL ?>/admin/rooms.php?tenant=<?= $p['tenant_id'] ?>&tab=assign#rooms" class="btn btn-sm btn-action-outline"><i class="bi bi-door-open"></i> Assign Room</a>
             <?php elseif ($status === 'approved'): ?>
               <span class="text-muted small">Assigned</span>
             <?php elseif (in_array($status, ['declined', 'rejected'], true)): ?>
@@ -215,7 +217,7 @@ $statusPills = [
           <label class="form-label">Reason <span class="text-muted">(optional, but the applicant will see it)</span></label>
           <textarea class="form-control" name="reason" rows="3" placeholder="e.g. Missing required documents, no rooms matching your request…"></textarea>
         </div>
-        <div class="modal-footer"><button class="btn btn-light" data-bs-dismiss="modal" type="button">Cancel</button><button class="btn btn-outline-maroon">Reject Application</button></div>
+        <div class="modal-footer"><button class="btn btn-light" data-bs-dismiss="modal" type="button">Cancel</button><button class="btn btn-sm btn-action-outline">Reject Application</button></div>
       </form>
     </div>
   </div>

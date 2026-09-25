@@ -32,7 +32,7 @@ $categories = [
 
 <div class="report-category-grid anchor-target" id="all-reports">
   <?php foreach ($categories as $key => $cat): ?>
-    <div class="panel anchor-target" id="<?= $key ?>">
+    <section class="report-category anchor-target" id="<?= $key ?>">
       <div class="panel-header"><h2><?= clean($cat['title']) ?></h2><span class="selection-state badge badge-maroon" hidden>Selected</span></div>
       <?php foreach ($cat['reports'] as $r): ?>
         <div class="report-card">
@@ -41,17 +41,15 @@ $categories = [
             <div><h3><?= clean($r['title']) ?></h3><p><?= clean($r['desc']) ?></p></div>
           </div>
           <div class="report-card-actions">
-            <a href="<?= BASE_URL ?>/admin/report_print.php?type=<?= $key ?>&mode=view" class="btn btn-outline-maroon btn-sm px-3 py-1.5 rounded-pill fs-7 js-review-btn" data-review-url="<?= BASE_URL ?>/admin/report_print.php?type=<?= $key ?>&mode=view"><i class="bi bi-eye-fill"></i> Review</a>
-            <a href="<?= BASE_URL ?>/admin/report_print.php?type=<?= $key ?>" target="_blank" class="btn btn-maroon btn-sm px-3 py-1.5 rounded-pill fs-7"><i class="bi bi-printer-fill"></i> Print</a>
-            <a href="<?= BASE_URL ?>/admin/report_export.php?type=<?= $key ?>" class="btn btn-outline-maroon btn-sm px-3 py-1.5 rounded-pill fs-7"><i class="bi bi-file-earmark-pdf-fill"></i> Export PDF</a>
+            <a href="<?= BASE_URL ?>/admin/report_print.php?type=<?= $key ?>&mode=view" class="btn btn-action-primary js-review-btn" data-review-url="<?= BASE_URL ?>/admin/report_print.php?type=<?= $key ?>&mode=view"><i class="bi bi-eye-fill"></i> Review</a>
+            <a href="<?= BASE_URL ?>/admin/report_print.php?type=<?= $key ?>" target="_blank" class="btn btn-sm btn-action-outline"><i class="bi bi-printer-fill"></i> Print</a>
+            <a href="<?= BASE_URL ?>/admin/report_export.php?type=<?= $key ?>" class="btn btn-sm btn-action-outline"><i class="bi bi-file-earmark-pdf-fill"></i> Export PDF</a>
           </div>
         </div>
       <?php endforeach; ?>
-    </div>
+    </section>
   <?php endforeach; ?>
 </div>
-
-<p class="text-muted small mt-3">"Review" opens the report on-screen to look over. "Print" opens the same view and sends it straight to your printer dialog. "Export PDF" downloads the report as a PDF file instead.</p>
 
 <div class="report-review-overlay" id="reportReviewOverlay" hidden>
   <div class="report-review-panel">
@@ -94,4 +92,60 @@ $extraScripts = "<script>
 })();
 </script>";
 include __DIR__ . '/../includes/footer.php';
+
 ?>
+<script>
+(function () {
+  // Review Overlay Modal Logic
+  var overlay = document.getElementById('reportReviewOverlay');
+  var frame = document.getElementById('reportReviewFrame');
+  var closeBtn = document.getElementById('reportReviewClose');
+
+  function openReview(url) {
+    frame.src = url;
+    overlay.hidden = false;
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeReview() {
+    overlay.hidden = true;
+    frame.src = 'about:blank';
+    document.body.style.overflow = '';
+  }
+
+  document.querySelectorAll('.js-review-btn').forEach(function (btn) {
+    btn.addEventListener('click', function (e) {
+      e.preventDefault();
+      openReview(btn.dataset.reviewUrl);
+    });
+  });
+
+  if (closeBtn) closeBtn.addEventListener('click', closeReview);
+  if (overlay) {
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay) closeReview();
+    });
+  }
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && overlay && !overlay.hidden) closeReview();
+  });
+
+  // Highlight Active Report Category from Hash / Module Tabs
+  function highlightCategory() {
+    var hash = window.location.hash.replace('#', '');
+    var categories = document.querySelectorAll('.report-category');
+    
+    categories.forEach(function (cat) {
+      if (hash === 'all-reports' || hash === '' || cat.id === hash) {
+        cat.classList.add('selected');
+      } else {
+        cat.classList.remove('selected');
+      }
+    });
+  }
+
+  window.addEventListener('hashchange', highlightCategory);
+  highlightCategory();
+})();
+</script>

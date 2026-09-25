@@ -138,7 +138,7 @@ render_page_header(
     'bi-wrench-adjustable',
     'Maintenance Management',
     'Log requests, assign tasks to teams, and track resolution progress.',
-    '<button type="button" class="btn btn-maroon" data-bs-toggle="modal" data-bs-target="#logRequestModal"><i class="bi bi-plus-lg"></i> Log New Request</button>'
+    '<button type="button" class="btn btn-sm btn-action-primary" data-bs-toggle="modal" data-bs-target="#logRequestModal"><i class="bi bi-plus-lg"></i> Log New Request</button>'
 );
 $tabKey = $statusFilter === 'Pending' ? 'assign' : ($statusFilter === 'Ongoing' ? 'status' : 'requests');
 render_module_tabs([
@@ -191,18 +191,21 @@ $priorityBadge = ['Urgent' => 'danger', 'High' => 'warning', 'Medium' => 'info',
           <td class="text-end" onclick="event.stopPropagation();" onmousedown="event.stopPropagation();" onfocus="event.stopPropagation();">
             <div class="d-flex justify-content-end gap-2 flex-wrap align-items-center">
               <?php if ($m['status'] === 'Pending'): ?>
-                <form method="post" class="d-inline-flex gap-1 align-items-center" onclick="event.stopPropagation();" onmousedown="event.stopPropagation();">
+                <form method="POST" action="maintenance.php" class="d-inline-flex align-items-center m-0" onclick="event.stopPropagation();" onmousedown="event.stopPropagation();">
                   <?= csrf_field() ?>
-                  <input type="hidden" name="action" value="assign">
                   <input type="hidden" name="maintenance_id" value="<?= $m['maintenance_id'] ?>">
-                  <select name="team" class="form-select form-select-sm assign-select" required onclick="event.stopPropagation();" onmousedown="event.stopPropagation();" onfocus="event.stopPropagation();">
-                    <option value="">Assign…</option>
-                    <?php foreach ($teams as $team): ?><option><?= clean($team) ?></option><?php endforeach; ?>
-                  </select>
-                  <button type="submit" class="btn btn-sm btn-maroon maintenance-action-button" onclick="event.stopPropagation();" onmousedown="event.stopPropagation();">Go</button>
+                  <input type="hidden" name="request_id" value="<?= $m['maintenance_id'] ?>">
+                  <input type="hidden" name="action" value="assign">
+                  <div class="input-group maintenance-assign-group">
+                    <select name="team" class="form-select" required onclick="event.stopPropagation();" onmousedown="event.stopPropagation();" onfocus="event.stopPropagation();">
+                      <option value="" disabled selected>Assign...</option>
+                      <?php foreach ($teams as $team): ?><option value="<?= clean($team) ?>"><?= clean($team) ?></option><?php endforeach; ?>
+                    </select>
+                    <button type="submit" class="btn btn-action-outline" onclick="event.stopPropagation();" onmousedown="event.stopPropagation();">Go</button>
+                  </div>
                 </form>
               <?php elseif ($m['status'] === 'Ongoing'): ?>
-                <form method="post" class="d-inline" onclick="event.stopPropagation();" onmousedown="event.stopPropagation();"><?= csrf_field() ?><input type="hidden" name="action" value="complete"><input type="hidden" name="maintenance_id" value="<?= $m['maintenance_id'] ?>"><button type="submit" class="btn btn-sm btn-outline-maroon maintenance-action-button" onclick="event.stopPropagation();" onmousedown="event.stopPropagation();">Mark Completed</button></form>
+                <form method="post" class="d-inline" onclick="event.stopPropagation();" onmousedown="event.stopPropagation();"><?= csrf_field() ?><input type="hidden" name="action" value="complete"><input type="hidden" name="maintenance_id" value="<?= $m['maintenance_id'] ?>"><button type="submit" class="btn btn-sm btn-action-outline" onclick="event.stopPropagation();" onmousedown="event.stopPropagation();">Mark Completed</button></form>
               <?php else: ?>
                 <span class="text-muted small"><?= $m['date_resolved'] ? clean(date('n/j/Y', strtotime($m['date_resolved']))) : '—' ?></span>
               <?php endif; ?>
@@ -295,7 +298,7 @@ $priorityBadge = ['Urgent' => 'danger', 'High' => 'warning', 'Medium' => 'info',
             <textarea class="form-control" name="description" rows="3" required placeholder="Describe the issue…"></textarea>
           <?php endif; ?>
         </div>
-        <div class="modal-footer"><button class="btn btn-light" data-bs-dismiss="modal" type="button">Cancel</button><?php if ($roomedTenants): ?><button class="btn btn-maroon">Log Request</button><?php endif; ?></div>
+        <div class="modal-footer"><button class="btn btn-sm btn-light" data-bs-dismiss="modal" type="button">Cancel</button><?php if ($roomedTenants): ?><button class="btn btn-sm btn-action-primary">Log Request</button><?php endif; ?></div>
       </form>
     </div>
   </div>

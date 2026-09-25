@@ -1,5 +1,5 @@
 -- ============================================================
--- Migration: add reset_otp / reset_otp_expires to users
+-- Migration: add password recovery OTP fields to users
 -- ============================================================
 -- Adds the two columns the "Forgot Password" OTP flow needs to
 -- temporarily hold a one-time code and its expiry while a user
@@ -19,5 +19,12 @@
 USE dorm_tenant_system;
 
 ALTER TABLE users
-  ADD COLUMN IF NOT EXISTS reset_otp VARCHAR(10) DEFAULT NULL AFTER password_hash,
-  ADD COLUMN IF NOT EXISTS reset_otp_expires DATETIME DEFAULT NULL AFTER reset_otp;
+  ADD COLUMN IF NOT EXISTS reset_otp_code VARCHAR(6) DEFAULT NULL AFTER password_hash,
+  ADD COLUMN IF NOT EXISTS reset_otp_expires_at DATETIME DEFAULT NULL AFTER reset_otp_code,
+  ADD COLUMN IF NOT EXISTS reset_otp_created_at DATETIME DEFAULT NULL AFTER reset_otp_expires_at;
+
+ALTER TABLE users
+  MODIFY COLUMN email VARCHAR(255) NOT NULL,
+  MODIFY COLUMN reset_otp_code VARCHAR(6) DEFAULT NULL,
+  MODIFY COLUMN reset_otp_expires_at DATETIME DEFAULT NULL,
+  MODIFY COLUMN reset_otp_created_at DATETIME DEFAULT NULL;

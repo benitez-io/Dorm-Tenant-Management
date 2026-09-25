@@ -139,13 +139,13 @@ include __DIR__ . '/../includes/header.php';
               <form method="post" onsubmit="return confirm('Send a renewal request to the dorm office?');">
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="request_renewal">
-                <button class="btn btn-sm btn-maroon"><i class="bi bi-arrow-repeat"></i> Request Renewal</button>
+                <button class="btn btn-sm btn-action-primary"><i class="bi bi-arrow-repeat"></i> Request Renewal</button>
               </form>
             <?php endif; ?>
           </div>
         <?php endif; ?>
         <?php if ($contract['contract_file']): ?>
-          <a href="<?= BASE_URL . '/' . clean($contract['contract_file']) ?>" target="_blank" class="btn btn-outline-maroon btn-sm mt-3"><i class="bi bi-file-earmark-text"></i> View Contract File</a>
+          <a href="<?= BASE_URL . '/' . clean($contract['contract_file']) ?>" target="_blank" class="btn btn-action-light mt-3"><i class="bi bi-file-earmark-text"></i> View Contract File</a>
         <?php endif; ?>
       <?php endif; ?>
     </div>

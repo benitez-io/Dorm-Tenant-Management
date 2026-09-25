@@ -7,14 +7,13 @@ if (is_logged_in()) {
 
 $errors = [];
 $success = false;
-$oldEmail = str_input($_GET, 'email');
-if ($oldEmail === '' && !empty($_SESSION['reset_email'])) {
+$oldEmail = '';
+if (!empty($_SESSION['reset_email'])) {
     $oldEmail = (string) $_SESSION['reset_email'];
-} elseif ($oldEmail === '' && !empty($_SESSION['email'])) {
+} elseif (!empty($_SESSION['email'])) {
     $oldEmail = (string) $_SESSION['email'];
-}
-if ($oldEmail !== '') {
-    $_SESSION['reset_email'] = $oldEmail;
+} else {
+  $oldEmail = str_input($_GET, 'email');
 }
 $demoOtp = preg_replace('/\D+/', '', (string) ($_SESSION['demo_otp'] ?? '138651'));
 if (strlen($demoOtp) !== 6) {
@@ -25,33 +24,42 @@ $demoOtpDisplay = substr($demoOtp, 0, 3) . ' - ' . substr($demoOtp, 3, 3);
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
     $email           = str_input($_POST, 'email');
-    $otp             = str_input($_POST, 'otp');
+    $otp             = str_input($_POST, 'otp_code', str_input($_POST, 'otp'));
     $newPassword     = str_input($_POST, 'new_password', '', false);
     $confirmPassword = str_input($_POST, 'confirm_password', '', false);
     $oldEmail        = $email;
+    $sessionEmail    = strtolower(trim((string) ($_SESSION['reset_email'] ?? '')));
 
-    $stmt = get_db()->prepare('SELECT * FROM users WHERE email = ?');
+    $stmt = get_db()->prepare('SELECT * FROM users WHERE LOWER(TRIM(email)) = LOWER(TRIM(?))');
     $stmt->execute([$email]);
     $user = $stmt->fetch();
 
-    $validCode = $user
-        && $user['reset_otp'] !== null
-        && hash_equals((string) $user['reset_otp'], $otp)
-        && $user['reset_otp_expires'] !== null
-        && strtotime($user['reset_otp_expires']) >= time();
+    $storedOtp = $user['reset_otp_code'] ?? null;
+    $expiresAt = $user['reset_otp_expires_at'] ?? null;
+    $otpExpired = $expiresAt === null || strtotime((string) $expiresAt) <= time();
+    $validCode = $user && $sessionEmail !== '' && hash_equals($sessionEmail, strtolower(trim($email)))
+      && $storedOtp !== null && !$otpExpired && hash_equals((string) $storedOtp, $otp);
 
     $pwdError = password_policy_error($newPassword);
 
     if (!$validCode) {
-        $errors[] = 'That code is invalid or has expired. Please request a new one.';
+      $errors[] = 'Invalid verification code.';
+    } elseif ($otpExpired) {
+      $errors[] = 'Verification code has expired.';
     } elseif ($pwdError !== null) {
         $errors[] = $pwdError;
     } elseif ($newPassword !== $confirmPassword) {
         $errors[] = 'Passwords do not match.';
     } else {
-        get_db()->prepare('UPDATE users SET password_hash = ?, reset_otp = NULL, reset_otp_expires = NULL, password_changed_at = NOW() WHERE user_id = ?')
-                ->execute([password_hash($newPassword, PASSWORD_DEFAULT), $user['user_id']]);
-        $success = true;
+        $db = get_db();
+        $stmt = $db->prepare('UPDATE users SET password_hash = ?, reset_otp_code = NULL, reset_otp_expires_at = NULL, reset_otp_created_at = NULL, password_changed_at = NOW() WHERE user_id = ? AND reset_otp_code = ?');
+        $stmt->execute([password_hash($newPassword, PASSWORD_BCRYPT), $user['user_id'], $storedOtp]);
+        $success = $stmt->rowCount() === 1;
+        if ($success) {
+          unset($_SESSION['reset_email'], $_SESSION['demo_otp'], $_SESSION['otp_last_sent_at']);
+        } else {
+          $errors[] = 'The verification code is no longer valid. Please request a new code.';
+        }
     }
 }
 
@@ -103,11 +111,12 @@ include __DIR__ . '/../includes/header.php';
             <?php foreach ($errors as $err): ?><div><?= clean($err) ?></div><?php endforeach; ?>
           </div>
         <?php endif; ?>
+        <div id="resetStatus" class="alert d-none" role="status" aria-live="polite"></div>
 
         <form method="post" class="needs-validation" novalidate id="resetForm">
           <?= csrf_field() ?>
           <input type="hidden" name="email" value="<?= clean($oldEmail) ?>">
-          <input type="hidden" name="otp" id="otp">
+          <input type="hidden" name="otp_code" id="otp_code">
 
           <div class="demo-otp-banner rounded-4 p-3 mb-4 d-flex align-items-center justify-content-between border border-warning-subtle shadow-sm">
             <div class="d-flex align-items-center gap-3">
@@ -126,7 +135,7 @@ include __DIR__ . '/../includes/header.php';
           <p class="text-muted small mb-3">Enter the 6-digit code from your email</p>
           <div class="otp-boxes">
             <?php for ($i = 0; $i < 6; $i++): ?>
-              <input type="text" class="otp-box otp-field form-control text-center fw-bold fs-4 rounded-3" id="otpBox<?= $i ?>" data-index="<?= $i ?>" inputmode="numeric" maxlength="1" autocomplete="one-time-code">
+              <input type="text" class="otp-box otp-field form-control text-center fw-bold fs-4 rounded-3" id="otpBox<?= $i ?>" data-index="<?= $i ?>" name="otp_digit_<?= $i ?>" inputmode="numeric" pattern="[0-9]*" maxlength="1" autocomplete="one-time-code" aria-label="OTP digit <?= $i + 1 ?>">
             <?php endfor; ?>
           </div>
           <div class="otp-dots-grid d-flex justify-content-between px-2 mt-2"><span class="dot-indicator active" data-dot="0"></span><span class="dot-indicator" data-dot="1"></span><span class="dot-indicator" data-dot="2"></span><span class="dot-indicator" data-dot="3"></span><span class="dot-indicator" data-dot="4"></span><span class="dot-indicator" data-dot="5"></span></div>
@@ -553,5 +562,6 @@ $extraScripts = <<<'HTML'
 })();
 </script>
 HTML;
+$extraScripts = '';
 include __DIR__ . '/../includes/footer.php';
 ?>
