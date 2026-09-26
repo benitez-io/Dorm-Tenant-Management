@@ -176,6 +176,7 @@ CREATE TABLE maintenance_requests (
   photo_file        VARCHAR(255) DEFAULT NULL,
   date_submitted    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   date_resolved     DATE DEFAULT NULL,
+  updated_at        TIMESTAMP NULL DEFAULT NULL ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_maint_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
   CONSTRAINT fk_maint_room   FOREIGN KEY (room_id)   REFERENCES dorm_rooms(room_id),
   INDEX idx_maint_status (status),

@@ -10,7 +10,7 @@ function render_page_header(string $icon, string $title, string $subtitle, ?stri
     <div class="breadcrumb-trail"><a class="breadcrumb-parent" href="<?= BASE_URL ?>/admin/dashboard.php">Admin Portal</a> <i class="bi bi-chevron-right"></i> <span class="breadcrumb-current"><?= clean($title) ?></span></div>
     <div class="page-header">
       <div class="page-header-main">
-        <span class="page-icon-avatar"><i class="bi <?= clean($icon) ?>"></i></span>
+        <span class="icon-wrapper icon-box page-icon-avatar"><i class="bi <?= clean($icon) ?>"></i></span>
         <div>
           <div class="page-title-row"><h1><?= clean($title) ?></h1></div>
           <p class="text-muted"><?= clean($subtitle) ?></p>

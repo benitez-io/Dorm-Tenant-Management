@@ -30,6 +30,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $errors[] = 'Incorrect email or password.';
     } elseif (!$user['is_active']) {
         $errors[] = 'This account has been deactivated. Please contact the administrator.';
+    } elseif (!in_array($user['role'], ['admin', 'tenant'], true)) {
+      $errors[] = 'This account does not have access to a supported portal.';
     } else {
         login_user($user);
         redirect($user['role'] === 'admin' ? '/admin/dashboard.php' : '/tenant/dashboard.php');
@@ -45,13 +47,13 @@ include __DIR__ . '/../includes/header.php';
     <div class="auth-panel-left auth-sidebar register-style-sidebar">
       <div class="sidebar-circle-accent"></div>
       <div class="position-relative z-1">
-        <div class="sidebar-icon-wrapper mb-3 d-flex align-items-center justify-content-center rounded-3"><i class="bi bi-box-arrow-in-right fs-4 text-white"></i></div>
+        <div class="icon-wrapper icon-box-xl sidebar-icon-wrapper mb-3"><i class="bi bi-box-arrow-in-right fs-4 text-white"></i></div>
         <h2 class="fw-bold fs-4 text-white mb-1">Dorm Tenant<br>Management System</h2>
         <p class="sidebar-description text-white-50 xs-text mb-3">Tenant Portal Access</p>
         <div class="sidebar-compact-list">
-          <div class="sidebar-info-card"><div class="sidebar-info-icon"><i class="bi bi-person fs-6"></i></div><div><h6>Personal Information</h6><span>Full name &amp; contact details</span></div></div>
-          <div class="sidebar-info-card"><div class="sidebar-info-icon"><i class="bi bi-at fs-6"></i></div><div><h6>Account Credentials</h6><span>Username &amp; secure password</span></div></div>
-          <div class="sidebar-info-card"><div class="sidebar-info-icon"><i class="bi bi-person-gear fs-6"></i></div><div><h6>Role Selection</h6><span>Admin or Tenant access</span></div></div>
+          <div class="sidebar-info-card"><div class="icon-wrapper icon-circle-sm sidebar-info-icon"><i class="bi bi-person fs-6"></i></div><div><h6>Personal Information</h6><span>Full name &amp; contact details</span></div></div>
+          <div class="sidebar-info-card"><div class="icon-wrapper icon-circle-sm sidebar-info-icon"><i class="bi bi-at fs-6"></i></div><div><h6>Account Credentials</h6><span>Username &amp; secure password</span></div></div>
+          <div class="sidebar-info-card"><div class="icon-wrapper icon-circle-sm sidebar-info-icon"><i class="bi bi-person-gear fs-6"></i></div><div><h6>Role Selection</h6><span>Admin or Tenant access</span></div></div>
         </div>
         <div class="demo-login-box compact-demo-login">
           <div class="demo-login-title">Quick Login (Demo)</div>
@@ -71,7 +73,7 @@ include __DIR__ . '/../includes/header.php';
         </div>
       <?php endif; ?>
 
-      <form method="post" id="loginForm" class="needs-validation" novalidate>
+      <form method="post" id="loginForm" class="needs-validation login-form" novalidate>
         <?= csrf_field() ?>
         <div class="mb-3">
           <label class="form-label small fw-semibold">Username or Email Address <span class="text-danger">*</span></label>

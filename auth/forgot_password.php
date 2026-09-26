@@ -64,7 +64,7 @@ include __DIR__ . '/../includes/header.php';
     <div class="auth-panel-left auth-sidebar register-style-sidebar">
       <div class="sidebar-circle-accent"></div>
       <div class="position-relative z-1">
-        <div class="sidebar-icon-wrapper mb-3 d-flex align-items-center justify-content-center rounded-3"><i class="bi bi-key-fill fs-4 text-white"></i></div>
+        <div class="icon-wrapper icon-box-xl sidebar-icon-wrapper mb-3"><i class="bi bi-key-fill fs-4 text-white"></i></div>
         <h2 class="fw-bold fs-4 text-white mb-1">Dorm Tenant<br>Management System</h2>
       </div>
     </div>
@@ -72,7 +72,7 @@ include __DIR__ . '/../includes/header.php';
       <a href="<?= BASE_URL ?>/auth/login.php" class="recovery-back"><i class="bi bi-arrow-left"></i> Back to Login</a>
 
       <div class="recovery-header">
-        <span class="recovery-icon"><i class="bi bi-arrow-repeat"></i></span>
+        <span class="icon-wrapper icon-circle recovery-icon"><i class="bi bi-arrow-repeat"></i></span>
         <div>
           <h2>Password Recovery</h2>
           <p class="recovery-subtitle">Enter your registered email to receive a 6-digit verification code.</p>

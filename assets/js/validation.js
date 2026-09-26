@@ -7,51 +7,44 @@
   'use strict';
 
   document.addEventListener('DOMContentLoaded', function () {
+    const loginForm = document.getElementById('loginForm');
+    const isLoginPage = loginForm !== null;
+
     // ---- Bootstrap's standard "needs-validation" pattern ---------------
     document.querySelectorAll('.needs-validation').forEach(function (form) {
       form.addEventListener('submit', function (event) {
-        if (!form.checkValidity()) {
+        const isValid = form.checkValidity();
+        if (!isValid) {
           event.preventDefault();
           event.stopPropagation();
         }
-        form.classList.add('was-validated');
+        if (!isLoginPage || form !== loginForm || !isValid) {
+          form.classList.add('was-validated');
+        }
       }, false);
     });
 
-    // ---- Contact numbers: a fixed "+63 " the user can't type over ------
-    // Every contact-number box in the system shows "+63" before anything
-    // is typed, and the tenant fills in only the 10-digit mobile number
-    // (which always starts with 9), so the field reads and posts as
-    // "+63 9123456789". The prefix is part of the field's value rather
-    // than a separate label, so it survives autofill, back-button
-    // restores and a re-rendered form after a failed submit.
-    const PH_PREFIX = '+63';
-    const PH_HEAD = PH_PREFIX.length + 1; // index of the first typed digit
-
-    /** The 10-digit subscriber number inside whatever the field holds. */
+    // ---- Philippine mobile numbers: 10 digits, grouped 3-3-4 ----------
     function phDigits(value) {
-      // Strip the mask's own prefix first — including a half-deleted one
-      // like "+6 " — so its 6 and 3 are never read as typed digits.
-      let rest = String(value == null ? '' : value).replace(/^[\s(]*\+?[\s(]*6?3?[\s)\-.]*/, '');
-      let digits = rest.replace(/\D+/g, '');
-      digits = digits.replace(/^0+/, '');             // 0912... -> 912...
-      if (digits.length > 10 && digits.indexOf('63') === 0) {
-        digits = digits.slice(2);                     // pasted +63 / 63 again
-      }
+      let digits = String(value == null ? '' : value).replace(/\D+/g, '');
+      digits = digits.replace(/^0+/, '');
+      if (digits.indexOf('63') === 0) digits = digits.slice(2);
       return digits.slice(0, 10);
     }
 
     function phFormat(digits) {
-      return digits ? PH_PREFIX + ' ' + digits : PH_PREFIX;
+      if (digits.length <= 3) return digits;
+      if (digits.length <= 6) return digits.slice(0, 3) + ' ' + digits.slice(3);
+      return digits.slice(0, 3) + ' ' + digits.slice(3, 6) + ' ' + digits.slice(6);
     }
 
     function phValidity(input, digits) {
       if (digits === '') {
         input.setCustomValidity(input.required ? 'Please enter a contact number.' : '');
       } else if (digits.charAt(0) !== '9') {
-        input.setCustomValidity('A Philippine mobile number starts with 9, e.g. +63 9123456789.');
+        input.setCustomValidity('A Philippine mobile number starts with 9, e.g. 912 123 1234.');
       } else if (digits.length < 10) {
-        input.setCustomValidity('Enter all 10 digits, e.g. +63 9123456789.');
+        input.setCustomValidity('Enter all 10 digits, e.g. 912 123 1234.');
       } else {
         input.setCustomValidity('');
       }
@@ -69,21 +62,14 @@
         if (formatted !== raw) {
           input.value = formatted;
         }
-        const caret = Math.min(PH_HEAD + before, formatted.length);
+        const separators = (before > 3 ? 1 : 0) + (before > 6 ? 1 : 0);
+        const caret = Math.min(before + separators, formatted.length);
         try { input.setSelectionRange(caret, caret); } catch (e) { /* not a text input */ }
       } else if (formatted !== raw) {
         input.value = formatted;
       }
 
       phValidity(input, digits);
-    }
-
-    /** Never let the caret sit inside "+63 ". */
-    function phGuardCaret(input) {
-      const min = Math.min(PH_HEAD, input.value.length);
-      if (input.selectionStart < min && input.selectionStart === input.selectionEnd) {
-        try { input.setSelectionRange(min, min); } catch (e) { /* ignore */ }
-      }
     }
 
     function phSetup(input) {
@@ -94,37 +80,13 @@
       input.setAttribute('inputmode', 'tel');
       input.setAttribute('autocomplete', 'tel');
       if (!input.getAttribute('placeholder')) {
-        input.setAttribute('placeholder', '+63 9123456789');
+        input.setAttribute('placeholder', '912 123 1234');
       }
 
       phRender(input, false);
 
       input.addEventListener('input', function () { phRender(input, true); });
-      input.addEventListener('focus', function () { window.setTimeout(function () { phGuardCaret(input); }, 0); });
-      input.addEventListener('click', function () { phGuardCaret(input); });
-      input.addEventListener('keyup', function (e) {
-        if (e.key === 'ArrowLeft' || e.key === 'Home') { phGuardCaret(input); }
-      });
       input.addEventListener('blur', function () { phRender(input, false); });
-
-      // Backspace/Delete with the caret parked in the prefix would eat
-      // the "+63" itself; every other edit is safe because the value is
-      // rebuilt from its digits on the way out.
-      input.addEventListener('keydown', function (e) {
-        if (e.key !== 'Backspace' && e.key !== 'Delete') {
-          return;
-        }
-        if (input.selectionStart !== input.selectionEnd) {
-          return; // a selection: clearing it is fine, the prefix comes back
-        }
-        const eatsPrefix = e.key === 'Backspace'
-          ? input.selectionStart <= PH_HEAD
-          : input.selectionStart < PH_HEAD;
-        if (eatsPrefix) {
-          e.preventDefault();
-          phGuardCaret(input);
-        }
-      });
     }
 
     // Anything explicitly marked, plus any phone/contact-number field —

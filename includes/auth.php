@@ -18,6 +18,16 @@ function login_user(array $user): void
     $_SESSION['last_name']  = $user['last_name'];
     $_SESSION['email']      = $user['email'];
     $_SESSION['pwd_changed_at'] = $user['password_changed_at'];
+    unset($_SESSION['tenant_id']);
+
+    if ($user['role'] === 'tenant') {
+        $tenantStatement = get_db()->prepare('SELECT tenant_id FROM tenants WHERE user_id = ?');
+        $tenantStatement->execute([$user['user_id']]);
+        $tenantId = $tenantStatement->fetchColumn();
+        if ($tenantId !== false) {
+            $_SESSION['tenant_id'] = (int) $tenantId;
+        }
+    }
 
     get_db()->prepare('UPDATE users SET last_login = NOW() WHERE user_id = ?')
              ->execute([$user['user_id']]);

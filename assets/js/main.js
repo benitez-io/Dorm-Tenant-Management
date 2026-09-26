@@ -212,7 +212,10 @@ document.addEventListener('DOMContentLoaded', function () {
       if (!input) return;
       const isPassword = input.type === 'password';
       input.type = isPassword ? 'text' : 'password';
-      if (icon) icon.className = isPassword ? 'bi bi-eye-slash' : 'bi bi-eye';
+      if (icon) {
+        icon.classList.remove('bi-eye', 'bi-eye-slash');
+        icon.classList.add(isPassword ? 'bi-eye-slash' : 'bi-eye');
+      }
       button.setAttribute('aria-label', isPassword ? 'Hide password' : 'Show password');
     });
   });
@@ -260,11 +263,14 @@ document.addEventListener('DOMContentLoaded', function () {
     toggle.type = 'button';
     toggle.className = 'pw-toggle js-toggle-password-btn';
     toggle.setAttribute('aria-label', 'Show password');
-    toggle.innerHTML = '<i class="bi bi-eye-slash js-password-icon"></i>';
+    const icon = document.createElement('i');
+    icon.className = 'bi bi-eye-slash js-password-icon';
+    toggle.appendChild(icon);
     toggle.addEventListener('click', function () {
       const showing = input.type === 'text';
       input.type = showing ? 'password' : 'text';
-      toggle.innerHTML = showing ? '<i class="bi bi-eye-slash js-password-icon"></i>' : '<i class="bi bi-eye js-password-icon"></i>';
+      icon.classList.remove('bi-eye', 'bi-eye-slash');
+      icon.classList.add(showing ? 'bi-eye-slash' : 'bi-eye');
       toggle.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
     });
     wrapper.appendChild(toggle);

@@ -145,42 +145,48 @@ require_once __DIR__ . '/../includes/module_tabs.php';
 
 <?php
 $extraScripts = "<script>
-const targetType = document.getElementById('targetType');
-const roomField = document.getElementById('targetRoomField');
-const tenantField = document.getElementById('targetTenantField');
-const roomInput = document.getElementById('targetValueRoom');
-const tenantSelect = document.getElementById('targetValueTenant');
-function syncTargetName() {
-  roomInput.name = tenantSelect.name = '';
-  if (targetType.value === 'room') roomInput.name = 'target_value';
-  if (targetType.value === 'tenant') tenantSelect.name = 'target_value';
-}
-targetType.addEventListener('change', function () {
-  roomField.classList.toggle('d-none', this.value !== 'room');
-  tenantField.classList.toggle('d-none', this.value !== 'tenant');
-  syncTargetName();
-});
-syncTargetName();
+(function () {
+  const targetType = document.getElementById('targetType');
+  const roomField = document.getElementById('targetRoomField');
+  const tenantField = document.getElementById('targetTenantField');
+  const roomInput = document.getElementById('targetValueRoom');
+  const tenantSelect = document.getElementById('targetValueTenant');
+  const subjectInput = document.getElementById('subjectInput');
+  const messageInput = document.getElementById('messageInput');
+  const previewBox = document.getElementById('previewBox');
+  if (!targetType || !roomField || !tenantField || !roomInput || !tenantSelect || !subjectInput || !messageInput || !previewBox) return;
 
-document.querySelectorAll('.type-option').forEach(function (opt) {
-  opt.addEventListener('click', function () {
-    document.querySelectorAll('.type-option').forEach(o => o.classList.remove('selected'));
-    opt.classList.add('selected');
-    opt.querySelector('input[type=radio]').checked = true;
-    document.getElementById('typeInput').value = opt.dataset.value;
+  function syncTargetName() {
+    roomInput.name = tenantSelect.name = '';
+    if (targetType.value === 'room') roomInput.name = 'target_value';
+    if (targetType.value === 'tenant') tenantSelect.name = 'target_value';
+  }
+  targetType.addEventListener('change', function () {
+    roomField.classList.toggle('d-none', this.value !== 'room');
+    tenantField.classList.toggle('d-none', this.value !== 'tenant');
+    syncTargetName();
   });
-});
+  syncTargetName();
 
-const subjectInput = document.getElementById('subjectInput');
-const messageInput = document.getElementById('messageInput');
-const previewBox = document.getElementById('previewBox');
-function updatePreview() {
-  const subject = subjectInput.value.trim();
-  const message = messageInput.value.trim();
-  previewBox.textContent = (subject || message) ? (subject ? subject + ' — ' : '') + message : 'Your message will appear here…';
-}
-subjectInput.addEventListener('input', updatePreview);
-messageInput.addEventListener('input', updatePreview);
+  document.querySelectorAll('.type-option').forEach(function (opt) {
+    opt.addEventListener('click', function () {
+      document.querySelectorAll('.type-option').forEach(function (item) { item.classList.remove('selected'); });
+      opt.classList.add('selected');
+      const radio = opt.querySelector('input[type=radio]');
+      const typeInput = document.getElementById('typeInput');
+      if (radio) radio.checked = true;
+      if (typeInput) typeInput.value = opt.dataset.value;
+    });
+  });
+
+  function updatePreview() {
+    const subject = subjectInput.value.trim();
+    const message = messageInput.value.trim();
+    previewBox.textContent = (subject || message) ? (subject ? subject + ' - ' : '') + message : 'Your message will appear here...';
+  }
+  subjectInput.addEventListener('input', updatePreview);
+  messageInput.addEventListener('input', updatePreview);
+})();
 </script>";
 include __DIR__ . '/../includes/footer.php';
 ?>

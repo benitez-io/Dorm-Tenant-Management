@@ -46,14 +46,13 @@ function normalize_notification_counts(array $counts): array
 }
 
 try {
-    $sessionUser = is_array($_SESSION['user'] ?? null) ? $_SESSION['user'] : [];
-    $userId = $_SESSION['user_id'] ?? $sessionUser['id'] ?? $_SESSION['id'] ?? 0;
-    $tenantId = $_SESSION['tenant_id'] ?? $sessionUser['tenant_id'] ?? 0;
-    $role = strtolower((string) ($_SESSION['role'] ?? $sessionUser['role'] ?? $_SESSION['user_type'] ?? 'tenant'));
+    $userId = (int) ($_SESSION['user_id'] ?? 0);
+    $tenantId = (int) ($_SESSION['tenant_id'] ?? 0);
+    $role = strtolower((string) ($_SESSION['role'] ?? ''));
     $emptyCounts = ['tenants' => 0, 'payments' => 0, 'maintenance' => 0, 'notifications' => 0, 'announcements' => 0];
 
-    if (!$userId) {
-        notification_json(['status' => 'success', 'counts' => normalize_notification_counts($emptyCounts), 'type' => 'actionable']);
+    if (!$userId || !in_array($role, ['admin', 'tenant'], true)) {
+        notification_json(['status' => 'success', 'counts' => normalize_notification_counts($emptyCounts)]);
     }
 
     $database = get_db();
@@ -88,19 +87,23 @@ try {
             [$cutoffs['payments']]
         );
 
-        // Admin: New/Unassigned maintenance requests needing attention
+        // Admin: Pending or active maintenance requests needing attention
         $counts['maintenance'] = notification_count(
             $database,
-            "SELECT COUNT(*) FROM maintenance_requests WHERE status IN ('Pending', 'Ongoing') AND date_submitted > ?",
+            "SELECT COUNT(*) FROM maintenance_requests
+             WHERE status IN ('Pending', 'Ongoing')
+             AND date_submitted > ?",
             [$cutoffs['maintenance']]
         );
 
-        // Admin: System notifications
+        // Informational announcements use the notification dot.
         $counts['announcements'] = notification_count(
             $database,
             "SELECT COUNT(*) FROM notifications WHERE type = 'Announcement' AND date_sent > ?",
             [$cutoffs['notifications']]
         );
+
+        // Direct alerts require review and use the number badge.
         $counts['notifications'] = notification_count(
             $database,
             "SELECT COUNT(*) FROM notifications WHERE type <> 'Announcement' AND date_sent > ?",
@@ -138,29 +141,48 @@ try {
                 }
             }
 
-            // Tenant Maintenance: active tickets submitted after the last visit.
+            // Use status timestamps when supported, while remaining compatible with older schemas.
+            $hasUpdatedAt = notification_count(
+                $database,
+                "SELECT COUNT(*) FROM information_schema.COLUMNS
+                 WHERE TABLE_SCHEMA = DATABASE()
+                 AND TABLE_NAME = 'maintenance_requests'
+                 AND COLUMN_NAME = 'updated_at'",
+                []
+            ) > 0;
+
+            $maintenanceQuery = $hasUpdatedAt
+                ? "SELECT COUNT(*) FROM maintenance_requests
+                   WHERE tenant_id = ?
+                         AND status IN ('Pending', 'Ongoing', 'Completed')
+                   AND (date_submitted > ? OR COALESCE(updated_at, date_submitted) > ?)"
+                : "SELECT COUNT(*) FROM maintenance_requests
+                   WHERE tenant_id = ?
+                         AND status IN ('Pending', 'Ongoing', 'Completed')
+                   AND date_submitted > ?";
+            $maintenanceParameters = $hasUpdatedAt
+                ? [$tenantId, $cutoffs['maintenance'], $cutoffs['maintenance']]
+                : [$tenantId, $cutoffs['maintenance']];
+
             $counts['maintenance'] = notification_count(
                 $database,
-                "SELECT COUNT(*) FROM maintenance_requests 
-                 WHERE tenant_id = ? 
-                 AND status IN ('Pending', 'Ongoing')
-                 AND date_submitted > ?",
-                [$tenantId, $cutoffs['maintenance']]
+                $maintenanceQuery,
+                $maintenanceParameters
             );
 
-            // Tenant Payments: Unpaid/Pending payment records or recently uploaded receipts
+            // Pending or overdue bills need tenant attention.
             $counts['payments'] = notification_count(
                 $database,
-                "SELECT COUNT(*) FROM payments WHERE tenant_id = ? AND payment_status = 'Pending' AND created_at > ?",
+                "SELECT COUNT(*) FROM payments WHERE tenant_id = ? AND payment_status IN ('Pending', 'Overdue') AND created_at > ?",
                 [$tenantId, $cutoffs['payments']]
             );
 
-            // Tenant Notifications & Announcements
+            // Target notifications to this tenant or their room.
             $targetFilter = "(target_type = 'all' OR (target_type = 'tenant' AND target_value = ?) OR (target_type = 'room' AND FIND_IN_SET(?, REPLACE(target_value, ' ', ''))))";
             $counts['announcements'] = notification_count(
                 $database,
                 "SELECT COUNT(*) FROM notifications WHERE type = 'Announcement' AND date_sent > ? AND {$targetFilter}",
-                [$cutoffs['notifications'], $tenantId, $roomNumber]
+                [$cutoffs['notifications'], (string) $tenantId, $roomNumber]
             );
             $counts['notifications'] = notification_count(
                 $database,
@@ -170,8 +192,8 @@ try {
         }
     }
 
-    notification_json(['status' => 'success', 'counts' => normalize_notification_counts($counts), 'type' => 'actionable']);
+    notification_json(['status' => 'success', 'counts' => normalize_notification_counts($counts)]);
 } catch (Throwable $exception) {
     error_log('Unread notification count error: ' . $exception->getMessage());
-    notification_json(['status' => 'success', 'counts' => normalize_notification_counts($emptyCounts), 'type' => 'actionable']);
+    notification_json(['status' => 'success', 'counts' => normalize_notification_counts($emptyCounts)]);
 }

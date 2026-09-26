@@ -37,7 +37,7 @@ $categories = [
       <?php foreach ($cat['reports'] as $r): ?>
         <div class="report-card">
           <div class="report-card-top">
-            <div class="report-card-icon"><?= $r['icon'] ?></div>
+            <div class="icon-wrapper icon-box report-card-icon"><?= $r['icon'] ?></div>
             <div><h3><?= clean($r['title']) ?></h3><p><?= clean($r['desc']) ?></p></div>
           </div>
           <div class="report-card-actions">
@@ -96,41 +96,6 @@ include __DIR__ . '/../includes/footer.php';
 ?>
 <script>
 (function () {
-  // Review Overlay Modal Logic
-  var overlay = document.getElementById('reportReviewOverlay');
-  var frame = document.getElementById('reportReviewFrame');
-  var closeBtn = document.getElementById('reportReviewClose');
-
-  function openReview(url) {
-    frame.src = url;
-    overlay.hidden = false;
-    document.body.style.overflow = 'hidden';
-  }
-
-  function closeReview() {
-    overlay.hidden = true;
-    frame.src = 'about:blank';
-    document.body.style.overflow = '';
-  }
-
-  document.querySelectorAll('.js-review-btn').forEach(function (btn) {
-    btn.addEventListener('click', function (e) {
-      e.preventDefault();
-      openReview(btn.dataset.reviewUrl);
-    });
-  });
-
-  if (closeBtn) closeBtn.addEventListener('click', closeReview);
-  if (overlay) {
-    overlay.addEventListener('click', function (e) {
-      if (e.target === overlay) closeReview();
-    });
-  }
-
-  document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && overlay && !overlay.hidden) closeReview();
-  });
-
   // Highlight Active Report Category from Hash / Module Tabs
   function highlightCategory() {
     var hash = window.location.hash.replace('#', '');

@@ -9,8 +9,6 @@
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css" rel="stylesheet">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link href="<?= BASE_URL ?>/assets/css/style.css?v=<?= @filemtime(__DIR__ . '/../assets/css/style.css') ?: '1' ?>" rel="stylesheet">
-<link href="<?= BASE_URL ?>/assets/css/tenant.css?v=<?= @filemtime(__DIR__ . '/../assets/css/tenant.css') ?: '1' ?>" rel="stylesheet">
-<link href="<?= BASE_URL ?>/assets/css/theme.css?v=<?= @filemtime(__DIR__ . '/../assets/css/theme.css') ?: '1' ?>" rel="stylesheet">
 <link href="<?= BASE_URL ?>/assets/css/custom-select.css?v=<?= @filemtime(__DIR__ . '/../assets/css/custom-select.css') ?: '1' ?>" rel="stylesheet">
 <link href="<?= BASE_URL ?>/assets/css/app-theme.css?v=<?= @filemtime(__DIR__ . '/../assets/css/app-theme.css') ?: '1' ?>" rel="stylesheet">
 </head>

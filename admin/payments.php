@@ -357,7 +357,7 @@ render_module_tabs([
 <div class="stat-grid stat-grid-3">
   <div class="stat-card"><div class="stat-card-body"><div class="stat-label">Collected This Month</div><div class="stat-value text-success"><?= peso($paidTotal) ?></div></div><div class="stat-icon stat-icon-outline"><i class="bi bi-check-lg"></i></div></div>
   <div class="stat-card"><div class="stat-card-body"><div class="stat-label">Pending</div><div class="stat-value"><?= $pending['c'] ?></div><div class="stat-sub"><?= peso($pending['t']) ?></div></div><div class="stat-icon stat-icon-outline"><i class="bi bi-clock-fill"></i></div></div>
-  <div class="stat-card"><div class="stat-card-body"><div class="stat-label">Overdue</div><div class="stat-value text-danger"><?= $overdue['c'] ?></div><div class="stat-sub"><?= peso($overdue['t']) ?></div></div><div class="stat-icon stat-icon-outline">!</div></div>
+  <div class="stat-card"><div class="stat-card-body"><div class="stat-label">Overdue</div><div class="stat-value text-danger"><?= $overdue['c'] ?></div><div class="stat-sub"><?= peso($overdue['t']) ?></div></div><div class="icon-wrapper icon-circle stat-icon stat-icon-outline"><i class="bi bi-exclamation-triangle-fill"></i></div></div>
 </div>
 
 <?php if ($activeTab === 'payments'): ?>

@@ -13,7 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $first = str_input($_POST, 'first_name');
         $last  = str_input($_POST, 'last_name');
         $email = str_input($_POST, 'email');
-        $role  = in_array($_POST['role'] ?? '', ['admin', 'maintenance_staff', 'tenant'], true) ? $_POST['role'] : 'tenant';
+        $role  = in_array($_POST['role'] ?? '', ['admin', 'tenant'], true) ? $_POST['role'] : 'tenant';
         $newPassword = str_input($_POST, 'new_password', '', false);
 
         if ($first === '' || $last === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {

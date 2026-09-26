@@ -23,6 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $old['emergency_contact_phone'] = str_input($_POST, 'emergency_contact_phone');
     $cleanContactNumber = preg_replace('/\D+/', '', $old['contact_number']);
     $cleanEmergencyPhone = preg_replace('/\D+/', '', $old['emergency_contact_phone']);
+    $cleanEmergencyPhone = preg_replace('/^(?:63|0)/', '', $cleanEmergencyPhone, 1);
 
     if ($old['first_name'] === '' || $old['last_name'] === '') {
         $errors[] = 'First and last name are required.';
@@ -39,10 +40,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($old['contact_number'] === '' || !preg_match('/^[0-9+() .-]{7,20}$/', $old['contact_number']) || strlen($cleanContactNumber) < 7) {
         $errors[] = 'Please enter a valid phone number.';
     }
-    foreach (['emergency_contact_phone' => [$old['emergency_contact_phone'], $cleanEmergencyPhone]] as $label => [$phone, $digits]) {
-      if ($phone !== '' && (!preg_match('/^[0-9+() .-]{7,20}$/', $phone) || strlen($digits) < 7)) {
-        $errors[] = ucfirst(str_replace('_', ' ', $label)) . ' must be a valid phone number.';
-      }
+    if ($cleanEmergencyPhone !== '' && (strlen($cleanEmergencyPhone) !== 10 || $cleanEmergencyPhone[0] !== '9')) {
+        $errors[] = 'Emergency contact phone must be a valid phone number.';
     }
 
     if (empty($errors)) {
@@ -100,13 +99,13 @@ include __DIR__ . '/../includes/header.php';
     <div class="auth-panel-left auth-sidebar text-white p-4 d-flex flex-column justify-content-between position-relative overflow-hidden">
       <div class="sidebar-circle-accent"></div>
       <div class="position-relative z-1">
-        <div class="sidebar-icon-wrapper mb-4 d-flex align-items-center justify-content-center rounded-4"><i class="bi bi-person-plus-fill fs-3 text-white"></i></div>
+        <div class="icon-wrapper icon-box-lg sidebar-icon-wrapper mb-4"><i class="bi bi-person-plus-fill fs-3 text-white"></i></div>
         <h2 class="fw-bold fs-3 text-white mb-2">Dorm Tenant<br>Management System</h2>
         <p class="sidebar-description text-white-50 small mb-4">Create your account to access the Dorm Tenant Rental Management System.</p>
         <div class="d-flex flex-column gap-3 mt-4">
-          <div class="sidebar-info-card p-3 rounded-4 d-flex align-items-center gap-3"><div class="sidebar-info-icon rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"><i class="bi bi-person fs-5"></i></div><div><h6 class="fw-bold mb-0 text-white fs-6">Personal Information</h6><span class="text-white-50 xs-text">Full name &amp; contact details</span></div></div>
-          <div class="sidebar-info-card p-3 rounded-4 d-flex align-items-center gap-3"><div class="sidebar-info-icon rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"><i class="bi bi-at fs-5"></i></div><div><h6 class="fw-bold mb-0 text-white fs-6">Account Credentials</h6><span class="text-white-50 xs-text">Username &amp; secure password</span></div></div>
-          <div class="sidebar-info-card p-3 rounded-4 d-flex align-items-center gap-3"><div class="sidebar-info-icon rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"><i class="bi bi-person-gear fs-5"></i></div><div><h6 class="fw-bold mb-0 text-white fs-6">Role Selection</h6><span class="text-white-50 xs-text">Admin or Tenant access</span></div></div>
+          <div class="sidebar-info-card p-3 rounded-4 d-flex align-items-center gap-3"><div class="icon-wrapper icon-circle-sm sidebar-info-icon"><i class="bi bi-person fs-5"></i></div><div><h6 class="fw-bold mb-0 text-white fs-6">Personal Information</h6><span class="text-white-50 xs-text">Full name &amp; contact details</span></div></div>
+          <div class="sidebar-info-card p-3 rounded-4 d-flex align-items-center gap-3"><div class="icon-wrapper icon-circle-sm sidebar-info-icon"><i class="bi bi-at fs-5"></i></div><div><h6 class="fw-bold mb-0 text-white fs-6">Account Credentials</h6><span class="text-white-50 xs-text">Username &amp; secure password</span></div></div>
+          <div class="sidebar-info-card p-3 rounded-4 d-flex align-items-center gap-3"><div class="icon-wrapper icon-circle-sm sidebar-info-icon"><i class="bi bi-person-gear fs-5"></i></div><div><h6 class="fw-bold mb-0 text-white fs-6">Role Selection</h6><span class="text-white-50 xs-text">Admin or Tenant access</span></div></div>
         </div>
       </div>
       <div class="sidebar-footer compact-sidebar-footer mt-auto position-relative z-1">
@@ -217,7 +216,7 @@ include __DIR__ . '/../includes/header.php';
           </div>
           <div class="col-md-6">
             <label class="form-label">Contact Phone</label>
-            <input type="tel" name="emergency_contact_phone" class="form-control" pattern="[0-9+() .-]{7,20}" value="<?= clean($old['emergency_contact_phone']) ?>">
+            <input type="tel" name="emergency_contact_phone" class="form-control" value="<?= clean($old['emergency_contact_phone']) ?>">
           </div>
         </div>
         <div class="policy-notice-box p-3 rounded-4 border d-flex align-items-start gap-2 my-3"><i class="bi bi-info-circle text-muted fs-5 flex-shrink-0 mt-1"></i><p class="text-secondary xs-text mb-0">By creating an account, you agree to the dorm management policies and confirm that the information provided is accurate.</p></div>

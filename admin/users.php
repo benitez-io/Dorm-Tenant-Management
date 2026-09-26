@@ -16,12 +16,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $password = str_input($_POST, 'password', '', false);
         $confirmPassword = str_input($_POST, 'confirm_password', '', false);
         $requestedRole = $_POST['role'] ?? '';
-        $role = in_array($requestedRole, ['admin', 'maintenance_staff', 'tenant'], true) ? $requestedRole : 'tenant';
+        $role = in_array($requestedRole, ['admin', 'tenant'], true) ? $requestedRole : 'tenant';
         $contactNumber = str_input($_POST, 'contact_number');
         $emergencyName = str_input($_POST, 'emergency_contact_name');
         $emergencyPhone = str_input($_POST, 'emergency_contact_phone');
+        $cleanEmergencyPhone = preg_replace('/\D+/', '', $emergencyPhone);
+        $cleanEmergencyPhone = preg_replace('/^(?:63|0)/', '', $cleanEmergencyPhone, 1);
+        $emergencyPhoneInvalid = $cleanEmergencyPhone !== ''
+          && (strlen($cleanEmergencyPhone) !== 10 || $cleanEmergencyPhone[0] !== '9');
 
-        if ($first === '' || $last === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || !in_array($requestedRole, ['admin', 'maintenance_staff', 'tenant'], true) || password_policy_error($password) !== null || $password !== $confirmPassword || $contactNumber === '' || !preg_match('/^[0-9+() .-]{7,20}$/', $contactNumber) || ($emergencyPhone !== '' && !preg_match('/^[0-9+() .-]{7,20}$/', $emergencyPhone))) {
+        if ($first === '' || $last === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || !in_array($requestedRole, ['admin', 'tenant'], true) || password_policy_error($password) !== null || $password !== $confirmPassword || $contactNumber === '' || !preg_match('/^[0-9+() .-]{7,20}$/', $contactNumber) || $emergencyPhoneInvalid) {
             flash('error', 'Please fill every field correctly (password needs at least 8 characters).');
         } else {
             $check = $db->prepare('SELECT user_id FROM users WHERE email = ?');
@@ -34,7 +38,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                  $newId = (int) $db->lastInsertId();
                  if ($role === 'tenant') {
                      $cleanPhone = preg_replace('/\D+/', '', $contactNumber);
-                     $cleanEmergencyPhone = preg_replace('/\D+/', '', $emergencyPhone);
                      $db->prepare('INSERT INTO tenants (user_id, status, approval_status, contact_number, emergency_contact_name, emergency_contact_phone, emergency_contact, emergency_phone) VALUES (?, "Pending", "Pending", ?, ?, ?, ?, ?)')
                        ->execute([$newId, $cleanPhone ?: null, $emergencyName ?: null, $cleanEmergencyPhone ?: null, $emergencyName ?: null, $cleanEmergencyPhone ?: null]);
                      log_activity($db, 'tenant_registered', $first . ' ' . $last . ' was registered by an admin', (int) $db->lastInsertId());
@@ -90,7 +93,7 @@ render_module_tabs([
         </div>
         <div class="mb-3"><label class="form-label">User Category</label><select name="category" class="form-select"><option value="" disabled selected>Select category...</option><option value="student">Student / Resident</option><option value="staff">Administrative Staff</option></select></div>
         <div class="mb-3"><label class="form-label">Emergency Contact Name</label><input class="form-control" name="emergency_contact_name" placeholder="Full name"></div>
-        <div class="mb-3"><label class="form-label">Emergency Contact Phone</label><input type="tel" class="form-control" name="emergency_contact_phone" pattern="[0-9+() .-]{7,20}" placeholder="+63 XXX XXX XXXX"></div>
+        <div class="mb-3"><label class="form-label">Emergency Contact Phone</label><input type="tel" class="form-control" name="emergency_contact_phone" placeholder="912 123 1234"></div>
         <button class="btn btn-sm btn-action-primary w-100 rounded-pill fw-bold">Save User</button>
       </section>
       <section class="registration-card role-selection-card">
@@ -98,7 +101,6 @@ render_module_tabs([
         <p class="text-muted small mb-4">Select the appropriate role for this user account.</p>
         <div class="role-selection-group">
           <input type="radio" name="role" id="admin_role_admin" value="admin" class="visually-hidden" required><label for="admin_role_admin" class="role-option-card"><span class="custom-radio-dot"></span><span class="role-icon-box"><i class="bi bi-shield-lock"></i></span><span><strong>Administrator</strong><small>Full access to system management features.</small></span></label>
-          <input type="radio" name="role" id="admin_role_staff" value="maintenance_staff" class="visually-hidden"><label for="admin_role_staff" class="role-option-card"><span class="custom-radio-dot"></span><span class="role-icon-box"><i class="bi bi-wrench"></i></span><span><strong>Maintenance Staff</strong><small>Access for maintenance tasks and requests.</small></span></label>
           <input type="radio" name="role" id="admin_role_tenant" value="tenant" class="visually-hidden" checked><label for="admin_role_tenant" class="role-option-card"><span class="custom-radio-dot"></span><span class="role-icon-box"><i class="bi bi-person"></i></span><span><strong>Tenant</strong><small>Portal access for rooms, payments, and requests.</small></span></label>
         </div>
       </section>

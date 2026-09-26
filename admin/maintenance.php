@@ -16,7 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!in_array($team, $teams, true)) {
             flash('error', 'Please choose a valid team.');
         } else {
-            $db->prepare("UPDATE maintenance_requests SET status='Ongoing', assigned_to=? WHERE maintenance_id=?")->execute([$team, $id]);
+            $db->prepare("UPDATE maintenance_requests SET status='Ongoing', assigned_to=?, updated_at=NOW() WHERE maintenance_id=?")->execute([$team, $id]);
             $mTenant = $db->prepare('SELECT tenant_id FROM maintenance_requests WHERE maintenance_id=?');
             $mTenant->execute([$id]);
             log_activity($db, 'maintenance_updated', "Request #$id assigned to $team", $mTenant->fetch()['tenant_id'] ?? null);
@@ -25,7 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($action === 'complete') {
-        $db->prepare("UPDATE maintenance_requests SET status='Completed', date_resolved=CURDATE() WHERE maintenance_id=?")->execute([$id]);
+        $db->prepare("UPDATE maintenance_requests SET status='Completed', date_resolved=CURDATE(), updated_at=NOW() WHERE maintenance_id=?")->execute([$id]);
         $mTenant = $db->prepare('SELECT tenant_id FROM maintenance_requests WHERE maintenance_id=?');
         $mTenant->execute([$id]);
         log_activity($db, 'maintenance_updated', "Request #$id marked completed", $mTenant->fetch()['tenant_id'] ?? null);
@@ -41,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             $assignedTo = $team !== '' ? $team : null;
             $resolvedDate = $status === 'Completed' ? date('Y-m-d') : null;
-            $db->prepare('UPDATE maintenance_requests SET status=?, assigned_to=?, date_resolved=? WHERE maintenance_id=?')
+            $db->prepare('UPDATE maintenance_requests SET status=?, assigned_to=?, date_resolved=?, updated_at=NOW() WHERE maintenance_id=?')
                ->execute([$status, $assignedTo, $resolvedDate, $id]);
 
             $mTenant = $db->prepare('SELECT tenant_id FROM maintenance_requests WHERE maintenance_id=?');

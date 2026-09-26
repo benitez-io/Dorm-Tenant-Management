@@ -61,7 +61,11 @@
       if (!item) return;
       item.classList.toggle('passed', checks[key]);
       const icon = item.querySelector('.req-icon');
-      if (icon) icon.className = checks[key] ? 'bi bi-check-circle-fill req-icon text-success' : 'bi bi-circle req-icon';
+      if (icon) {
+        icon.classList.remove('bi-circle', 'bi-check-circle-fill');
+        icon.classList.add(checks[key] ? 'bi-check-circle-fill' : 'bi-circle');
+        icon.classList.toggle('text-success', checks[key]);
+      }
     });
     const counter = document.getElementById('requirements-counter');
     if (counter) counter.textContent = score + '/5 requirements met';
@@ -253,7 +257,8 @@
         if (!input || !icon) return;
         input.type = input.type === 'password' ? 'text' : 'password';
         if (icon.classList) {
-          icon.className = input.type === 'password' ? 'bi bi-eye' : 'bi bi-eye-slash';
+          icon.classList.remove('bi-eye', 'bi-eye-slash');
+          icon.classList.add(input.type === 'password' ? 'bi-eye' : 'bi-eye-slash');
         }
       });
     });

@@ -263,7 +263,7 @@ function getSystemActivityIcon(string $activityType): array {
         <span class="badge badge-<?= $billedGrowth >= 0 ? 'success' : 'danger' ?> mt-3 d-inline-block"><i class="bi bi-arrow-<?= $billedGrowth >= 0 ? 'up' : 'down' ?>"></i> <?= abs($billedGrowth) ?>% vs last month</span>
       <?php endif; ?>
     </div>
-    <div class="stat-icon stat-icon-green"><i class="bi bi-graph-up-arrow"></i></div>
+    <div class="icon-wrapper icon-circle stat-icon stat-icon-green"><i class="bi bi-graph-up-arrow"></i></div>
   </div>
   <div class="stat-card h-100">
     <div class="stat-card-body d-flex flex-column justify-content-between h-100">
@@ -274,7 +274,7 @@ function getSystemActivityIcon(string $activityType): array {
       </div>
       <?php if ($overdueTenantCount > 0): ?><span class="badge badge-danger mt-3 d-inline-block">Action Required</span><?php endif; ?>
     </div>
-    <div class="stat-icon stat-icon-red"><i class="bi bi-exclamation-triangle-fill"></i></div>
+    <div class="icon-wrapper icon-circle stat-icon stat-icon-red"><i class="bi bi-exclamation-triangle-fill"></i></div>
   </div>
   <div class="stat-card h-100">
     <div class="stat-card-body d-flex flex-column justify-content-between h-100">
@@ -285,7 +285,7 @@ function getSystemActivityIcon(string $activityType): array {
       </div>
       <?php if ($urgentMaintenance > 0): ?><span class="badge badge-warning mt-3 d-inline-block"><?= $urgentMaintenance ?> Urgent</span><?php endif; ?>
     </div>
-    <div class="stat-icon stat-icon-amber"><i class="bi bi-tools"></i></div>
+    <div class="icon-wrapper icon-circle stat-icon stat-icon-amber"><i class="bi bi-tools"></i></div>
   </div>
   <div class="stat-card pending-reg-card h-100 pb-3">
     <div class="stat-card-body d-flex flex-column justify-content-between h-100">
@@ -296,7 +296,7 @@ function getSystemActivityIcon(string $activityType): array {
       </div>
       <?php if ($pendingRegistrations > 0): ?><span class="badge pending-review-badge mt-2 d-inline-flex align-items-center justify-content-center">Needs Review</span><?php endif; ?>
     </div>
-    <div class="stat-icon pending-reg-icon"><i class="bi bi-person-lines-fill"></i></div>
+    <div class="icon-wrapper icon-circle stat-icon pending-reg-icon"><i class="bi bi-person-lines-fill"></i></div>
   </div>
 </div>
 
@@ -354,11 +354,11 @@ function getSystemActivityIcon(string $activityType): array {
             <?php $rawTimestamp = $a['created_at'] ?? null; ?>
             <?php $meta = getSystemActivityIcon($a['activity_type'] ?? 'default'); ?>
             <div class="activity-row d-flex align-items-center gap-3 p-2 rounded-3 hover-bg-light">
-              <div class="icon-avatar rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 <?= $meta['bg_color'] ?>" style="width: 38px; height: 38px;">
+              <div class="icon-wrapper icon-circle icon-avatar <?= $meta['bg_color'] ?>">
                 <i class="bi <?= $meta['icon'] . ' ' . $meta['text_color'] ?> fs-6"></i>
               </div>
               <div class="flex-grow-1 min-w-0">
-                <p class="mb-0 text-dark fw-medium xxs-text text-truncate"><?= clean($a['description']) ?></p>
+                <p class="activity-text mb-0 text-dark fw-medium xxs-text"><?= clean($a['description']) ?></p>
                 <span class="text-muted xxs-text js-relative-time" data-relative-time="<?= clean(!empty($rawTimestamp) ? date('c', strtotime((string) $rawTimestamp)) : '') ?>"><?= clean(time_ago($rawTimestamp)) ?></span>
               </div>
             </div>

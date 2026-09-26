@@ -72,17 +72,17 @@ include __DIR__ . '/../includes/header.php';
     <div class="auth-panel-left auth-sidebar register-style-sidebar">
       <div class="sidebar-circle-accent"></div>
       <div class="position-relative z-1">
-        <div class="sidebar-icon-wrapper mb-3 d-flex align-items-center justify-content-center rounded-3"><i class="bi bi-key-fill fs-4 text-white"></i></div>
+        <div class="icon-wrapper icon-box-xl sidebar-icon-wrapper mb-3"><i class="bi bi-key-fill fs-4 text-white"></i></div>
         <h2 class="fw-bold fs-4 text-white mb-1">Dorm Tenant<br>Management System</h2>
         <p class="sidebar-description text-white-50 xs-text mb-3">Secure Password Reset</p>
-        <div class="sidebar-compact-list"><div class="sidebar-info-card"><div class="sidebar-info-icon"><i class="bi bi-key fs-6"></i></div><div><h6>Verification Code</h6><span>Confirm your email securely</span></div></div><div class="sidebar-info-card"><div class="sidebar-info-icon"><i class="bi bi-shield-check fs-6"></i></div><div><h6>New Password</h6><span>Protect your tenant account</span></div></div></div>
+        <div class="sidebar-compact-list"><div class="sidebar-info-card"><div class="icon-wrapper icon-circle-sm sidebar-info-icon"><i class="bi bi-key fs-6"></i></div><div><h6>Verification Code</h6><span>Confirm your email securely</span></div></div><div class="sidebar-info-card"><div class="icon-wrapper icon-circle-sm sidebar-info-icon"><i class="bi bi-shield-check fs-6"></i></div><div><h6>New Password</h6><span>Protect your tenant account</span></div></div></div>
       </div>
       <div class="sidebar-footer compact-sidebar-footer position-relative z-1"><hr class="sidebar-divider mb-3 opacity-25 border-white"><div class="login-redirect-card compact-login-card"><p>Remembered your password?</p><a href="<?= BASE_URL ?>/auth/login.php" class="btn btn-light"><i class="bi bi-chevron-left"></i> Sign In</a></div></div>
     </div>
     <div class="auth-panel-right auth-content">
       <?php if ($success): ?>
         <div class="recovery-success">
-          <span class="recovery-icon"><i class="bi bi-check-lg"></i></span>
+          <span class="icon-wrapper icon-circle recovery-icon"><i class="bi bi-check-lg"></i></span>
           <h2>Password Reset Successful</h2>
           <p class="text-muted">Your password has been updated. Sign in with your new credentials.</p>
           <div class="callout callout-success">
@@ -95,7 +95,7 @@ include __DIR__ . '/../includes/header.php';
         <a href="<?= BASE_URL ?>/auth/forgot_password.php" class="recovery-back"><i class="bi bi-arrow-left"></i> Back</a>
 
         <div class="recovery-header">
-          <span class="recovery-icon"><i class="bi bi-key-fill"></i></span>
+          <span class="icon-wrapper icon-circle recovery-icon"><i class="bi bi-key-fill"></i></span>
           <div>
             <h2>Verify &amp; Reset</h2>
             <p class="recovery-subtitle">Enter the code sent to your email and set a new password.</p>
@@ -120,7 +120,7 @@ include __DIR__ . '/../includes/header.php';
 
           <div class="demo-otp-banner rounded-4 p-3 mb-4 d-flex align-items-center justify-content-between border border-warning-subtle shadow-sm">
             <div class="d-flex align-items-center gap-3">
-              <div class="demo-icon-box rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"><i class="bi bi-stars text-warning fs-5"></i></div>
+              <div class="icon-wrapper icon-box demo-icon-box"><i class="bi bi-stars text-warning fs-5"></i></div>
               <div>
                 <div class="fw-bold text-dark small mb-1">Verification Code Sent</div>
                 <div class="d-flex align-items-center gap-2">
@@ -477,10 +477,12 @@ $extraScripts = <<<'HTML'
 
         if (input.type === 'password') {
           input.type = 'text';
-          icon.className = 'bi bi-eye-slash';
+          icon.classList.remove('bi-eye', 'bi-eye-slash');
+          icon.classList.add('bi-eye-slash');
         } else {
           input.type = 'password';
-          icon.className = 'bi bi-eye';
+          icon.classList.remove('bi-eye', 'bi-eye-slash');
+          icon.classList.add('bi-eye');
         }
       };
     });
@@ -509,10 +511,12 @@ $extraScripts = <<<'HTML'
         if (isPassed) {
           passedCount++;
           el.classList.add('passed');
-          icon.className = 'bi bi-check-circle-fill req-icon text-success';
+          icon.classList.remove('bi-circle');
+          icon.classList.add('bi-check-circle-fill', 'text-success');
         } else {
           el.classList.remove('passed');
-          icon.className = 'bi bi-circle req-icon';
+          icon.classList.remove('bi-check-circle-fill', 'text-success');
+          icon.classList.add('bi-circle');
         }
       });
 

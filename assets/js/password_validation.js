@@ -22,7 +22,11 @@
       if (!item) return;
       item.classList.toggle('passed', checks[key]);
       const icon = item.querySelector('.req-icon');
-      if (icon) icon.className = checks[key] ? 'bi bi-check-circle-fill req-icon text-success' : 'bi bi-circle req-icon';
+      if (icon) {
+        icon.classList.remove('bi-circle', 'bi-check-circle-fill');
+        icon.classList.add(checks[key] ? 'bi-check-circle-fill' : 'bi-circle');
+        icon.classList.toggle('text-success', checks[key]);
+      }
     });
 
     const counter = document.getElementById('requirements-counter');

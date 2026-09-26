@@ -27,7 +27,7 @@ if (!$tenant || $tenant['approval_status'] !== 'Approved') {
     } else {
         ?>
         <div class="pending-screen">
-          <div class="pending-icon">⏳</div>
+          <div class="icon-wrapper icon-circle pending-icon"><i class="bi bi-hourglass-split"></i></div>
           <h2>Your application is under review</h2>
           <p class="text-muted">An admin needs to approve your application before your dashboard unlocks. Check back soon — we'll email you once it's approved.</p>
         </div>
