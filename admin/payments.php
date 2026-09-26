@@ -204,10 +204,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($action === 'verify_payment') {
         $paymentId = (int) ($_POST['payment_id'] ?? 0);
         $newStatus = $_POST['new_status'] ?? 'Paid';
-        $paymentRow = $db->prepare('SELECT tenant_id, payment_status FROM payments WHERE payment_id = ?');
+        $paymentRow = $db->prepare('SELECT tenant_id, payment_status, payment_method, paymongo_checkout_id FROM payments WHERE payment_id = ?');
         $paymentRow->execute([$paymentId]);
         $paymentRow = $paymentRow->fetch();
         $paymentTenantId = $paymentRow['tenant_id'] ?? null;
+        $isOnlinePayment = $paymentRow && $paymentRow['paymongo_checkout_id'] && paymongo_method_by_label($paymentRow['payment_method']);
 
         // A Failed row is a checkout that never went through — no money
         // actually came in, so it can't be promoted straight to Paid.
@@ -215,6 +216,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // confirmed this way.
         if (!$paymentRow) {
             flash('error', 'That payment could not be found. Please refresh and try again.');
+        } elseif ($newStatus === 'Paid' && $isOnlinePayment) {
+            flash('error', 'This is an online ' . $paymentRow['payment_method'] . ' payment — it is confirmed automatically once PayMongo verifies it and cannot be marked Paid manually.');
         } elseif ($newStatus === 'Paid' && !in_array($paymentRow['payment_status'], ['Pending', 'Overdue'], true)) {
             flash('error', 'That payment is ' . $paymentRow['payment_status'] . ' and can\'t be marked Paid directly. Record a new payment for the tenant instead if they paid in cash.');
         } else {
@@ -391,15 +394,19 @@ render_module_tabs([
           <td class="small"><?= clean($p['payment_for_month'] ?: '—') ?></td>
           <td><?= peso($p['payment_amount']) ?></td>
           <td class="small">
-            <?php if ($p['payment_method'] === 'GCash' && $p['paymongo_checkout_id']): ?>
-              <span class="badge badge-info"><i class="bi bi-phone"></i> GCash</span>
+            <?php $onlineMethod = $p['paymongo_checkout_id'] ? paymongo_method_by_label($p['payment_method']) : null; ?>
+            <?php if ($onlineMethod): ?>
+              <span class="badge badge-info"><i class="bi <?= clean($onlineMethod['icon']) ?>"></i> <?= clean($onlineMethod['label']) ?></span>
             <?php else: ?>
               <?= clean($p['payment_method'] ?: '—') ?>
             <?php endif; ?>
           </td>
           <td><span class="badge badge-<?= status_badge_class($p['payment_status']) ?>"><?= clean($p['payment_status']) ?></span></td>
           <td class="text-end">
-            <?php if (in_array($p['payment_status'], ['Pending', 'Overdue'], true)): ?>
+            <?php $isOnlinePayment = $onlineMethod !== null; ?>
+            <?php if ($isOnlinePayment && in_array($p['payment_status'], ['Pending', 'Overdue'], true)): ?>
+              <span class="text-muted small">Awaiting <?= clean($onlineMethod['label']) ?> confirmation</span>
+            <?php elseif (in_array($p['payment_status'], ['Pending', 'Overdue'], true)): ?>
               <form method="post" class="d-inline"><?= csrf_field() ?><input type="hidden" name="action" value="verify_payment"><input type="hidden" name="payment_id" value="<?= $p['payment_id'] ?>"><input type="hidden" name="new_status" value="Paid"><button class="btn btn-sm btn-action-primary">Mark Paid</button></form>
             <?php elseif ($p['payment_status'] === 'Paid'): ?>
               <span class="text-muted small"><?= clean(date('n/j/Y', strtotime($p['payment_date']))) ?></span>

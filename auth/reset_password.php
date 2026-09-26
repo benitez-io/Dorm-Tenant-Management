@@ -15,12 +15,6 @@ if (!empty($_SESSION['reset_email'])) {
 } else {
   $oldEmail = str_input($_GET, 'email');
 }
-$demoOtp = preg_replace('/\D+/', '', (string) ($_SESSION['demo_otp'] ?? '138651'));
-if (strlen($demoOtp) !== 6) {
-    $demoOtp = '138651';
-}
-$demoOtpDisplay = substr($demoOtp, 0, 3) . ' - ' . substr($demoOtp, 3, 3);
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
     $email           = str_input($_POST, 'email');
@@ -56,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute([password_hash($newPassword, PASSWORD_BCRYPT), $user['user_id'], $storedOtp]);
         $success = $stmt->rowCount() === 1;
         if ($success) {
-          unset($_SESSION['reset_email'], $_SESSION['demo_otp'], $_SESSION['otp_last_sent_at']);
+          unset($_SESSION['reset_email'], $_SESSION['otp_last_sent_at']);
         } else {
           $errors[] = 'The verification code is no longer valid. Please request a new code.';
         }
@@ -118,18 +112,9 @@ include __DIR__ . '/../includes/header.php';
           <input type="hidden" name="email" value="<?= clean($oldEmail) ?>">
           <input type="hidden" name="otp_code" id="otp_code">
 
-          <div class="demo-otp-banner rounded-4 p-3 mb-4 d-flex align-items-center justify-content-between border border-warning-subtle shadow-sm">
-            <div class="d-flex align-items-center gap-3">
-              <div class="icon-wrapper icon-box demo-icon-box"><i class="bi bi-stars text-warning fs-5"></i></div>
-              <div>
-                <div class="fw-bold text-dark small mb-1">Verification Code Sent</div>
-                <div class="d-flex align-items-center gap-2">
-                  <span class="text-muted xs-text">Your code:</span>
-                  <span id="demoCodeBadge" class="demo-code-pill fw-bold text-dark px-2.5 py-0.5 rounded-pill font-monospace fs-6" data-raw-otp="<?= htmlspecialchars($demoOtp, ENT_QUOTES, 'UTF-8') ?>"><?= htmlspecialchars($demoOtpDisplay) ?></span>
-                </div>
-              </div>
-            </div>
-            <button type="button" id="autoFillBtn" class="btn btn-autofill rounded-pill px-3 py-1.5 fw-bold btn-sm d-flex align-items-center gap-1.5 text-white shadow-sm flex-shrink-0"><i class="bi bi-clipboard-check"></i><span>Auto-fill</span></button>
+          <div class="callout callout-info mb-4">
+            <i class="bi bi-envelope-check-fill"></i>
+            <div>We sent a 6-digit verification code to your email. It expires in 15 minutes.</div>
           </div>
           <label class="form-label fw-bold">Verification Code <span class="text-danger">*</span></label>
           <p class="text-muted small mb-3">Enter the 6-digit code from your email</p>
@@ -237,17 +222,6 @@ $extraScripts = <<<'HTML'
   const statusOtp = document.getElementById('statusOtp');
   if (!otpBoxes.length) return;
 
-  function populateOtp(codeString) {
-    const digits = (codeString || '').replace(/\D/g, '').slice(0, otpBoxes.length);
-    otpBoxes.forEach((box, index) => {
-      box.value = digits[index] || '';
-    });
-    if (otpBoxes[Math.min(digits.length, otpBoxes.length - 1)]) {
-      otpBoxes[Math.min(digits.length, otpBoxes.length - 1)].focus();
-    }
-    syncOtp();
-  }
-
   function updateSubmit() {
     const otpDone = otpHidden ? otpHidden.value.length === 6 : false;
     const otpDot = document.getElementById('dot-otp');
@@ -342,15 +316,6 @@ $extraScripts = <<<'HTML'
       syncOtp();
     });
   });
-
-  const autoFillBtn = document.getElementById('autoFillBtn');
-  const demoCodeBadge = document.getElementById('demoCodeBadge');
-  if (autoFillBtn && demoCodeBadge) {
-    autoFillBtn.addEventListener('click', function () {
-      const digits = demoCodeBadge.getAttribute('data-raw-otp') || demoCodeBadge.textContent || '';
-      populateOtp(digits);
-    });
-  }
 
   syncOtp();
 

@@ -142,16 +142,7 @@ $rentPaid = $rent['state'] === 'Paid';
   </div>
 </div>
 
-<?php if ($contractExpired): ?>
-  <div class="alert alert-danger mt-3">
-    <i class="bi bi-exclamation-octagon-fill"></i> <strong>Your contract has expired</strong> — it ended on <?= clean(date('F j, Y', strtotime($contract['contract_end']))) ?>.
-    <?php if (!empty($contract['renewal_requested_at'])): ?>
-      You asked the office to renew it on <?= clean(date('F j, Y', strtotime($contract['renewal_requested_at']))) ?>; they'll be in touch.
-    <?php else: ?>
-      You can ask the office to continue it from <a href="<?= BASE_URL ?>/tenant/services.php">My Room &amp; Contract</a>.
-    <?php endif; ?>
-  </div>
-<?php elseif ($contract && days_until($contract['contract_end']) <= 14): ?>
+<?php if ($contract && days_until($contract['contract_end']) <= 14 && !$contractExpired): ?>
   <div class="alert alert-warning mt-3"><i class="bi bi-exclamation-triangle-fill"></i> Your contract expires in <?= days_until($contract['contract_end']) ?> day(s). You can <a href="<?= BASE_URL ?>/tenant/services.php">request a renewal</a> or visit the office.</div>
 <?php endif; ?>
 <?php if ($nextDue): ?>

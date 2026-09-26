@@ -54,7 +54,6 @@ try {
     }
 
     $otp = (string) random_int(100000, 999999);
-    $_SESSION['demo_otp'] = $otp;
     $_SESSION['reset_email'] = $email;
     $_SESSION['email'] = $email;
     $_SESSION['otp_last_sent_at'] = $now;

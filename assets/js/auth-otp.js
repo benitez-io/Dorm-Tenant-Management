@@ -187,8 +187,7 @@
         }
         sessionStorage.setItem('reset_email', email);
         jsonRequest(forgotForm.dataset.endpoint || forgotForm.action, { email: email, csrf_token: forgotForm.querySelector('[name="csrf_token"]')?.value || '' })
-          .then(function (data) {
-            if (data.debug_otp) sessionStorage.setItem('latest_otp', String(data.debug_otp));
+          .then(function () {
             window.location.assign(forgotForm.dataset.redirect + '?email=' + encodeURIComponent(email));
           })
           .catch(function (error) {
@@ -240,12 +239,6 @@
       });
     });
     document.querySelectorAll('#newPassword, #confirmPassword').forEach(function (input) { input.addEventListener('input', syncOtp); });
-    const autoFillButton = document.getElementById('autoFillBtn') || document.getElementById('auto-fill-btn') || document.querySelector('.btn-auto-fill');
-    if (autoFillButton) autoFillButton.addEventListener('click', function () {
-      const badge = document.getElementById('demoCodeBadge') || document.querySelector('.otp-display, .otp-code-display');
-      const displayedCode = badge ? (badge.dataset.rawOtp || badge.textContent) : '';
-      fillOtp(displayedCode || sessionStorage.getItem('latest_otp'));
-    });
     startResendTimer();
     bindResendRequest();
     document.querySelectorAll('.toggle-password, .toggle-password-btn, #eye-icon, .btn-toggle-eye').forEach(function (button) {
@@ -274,7 +267,6 @@
       };
       jsonRequest(resetForm.dataset.endpoint || resetForm.action, payload).then(function () {
         sessionStorage.removeItem('reset_email');
-        sessionStorage.removeItem('latest_otp');
         if (resetForm.dataset.successUrl) window.location.assign(resetForm.dataset.successUrl);
       }).catch(function (error) {
         document.querySelectorAll('.otp-box, .otp-input, .otp-input-box').forEach(function (box) { box.classList.add('is-invalid'); });

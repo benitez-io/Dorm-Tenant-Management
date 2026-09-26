@@ -46,6 +46,11 @@ include __DIR__ . '/../includes/header.php';
         <span class="badge badge-secondary ms-2"><?= clean($n['type']) ?></span>
         <p class="text-muted small mb-1 mt-1"><?= clean($n['message']) ?></p>
         <div class="text-muted small"><?= clean(date('F j, Y g:i A', strtotime($n['date_sent']))) ?></div>
+        <?php if ($n['type'] === 'Contract Expiry Alert'): ?>
+          <a href="<?= BASE_URL ?>/tenant/services.php" class="btn btn-sm btn-action-primary mt-2">
+            <i class="bi bi-file-earmark-text"></i> View My Room &amp; Contract
+          </a>
+        <?php endif; ?>
       </div>
     </div>
   <?php endforeach; ?>

@@ -15,7 +15,8 @@ refresh_contract_statuses($db);
 // terminated one is closed to new payments.
 $contract = tenant_current_contract($db, (int) $tenant['tenant_id']);
 $contractExpired = contract_is_expired($contract);
-$monthOptions = billing_month_options(3, 1);
+$monthOptions = $contract ? contract_billing_months($contract) : [];
+$paidMonths   = $contract ? tenant_paid_months($db, (int) $tenant['tenant_id']) : [];
 
 // The online options switched on in config/paymongo.php (GCash / PayMaya / GoTyme).
 $payMethods = paymongo_enabled_methods();
@@ -214,11 +215,6 @@ include __DIR__ . '/../includes/header.php';
       <?php if (!$contract): ?>
         <p class="text-muted py-3">You don't have an active contract yet, so there's nothing to pay against right now.</p>
       <?php else: ?>
-        <?php if ($contractExpired): ?>
-          <div class="alert alert-warning">
-            <i class="bi bi-exclamation-triangle-fill"></i> Your contract expired on <?= clean(date('F j, Y', strtotime($contract['contract_end']))) ?>. You can still settle any rent you owe for it — ask the office to renew from <a href="<?= BASE_URL ?>/tenant/services.php">My Room &amp; Contract</a>.
-          </div>
-        <?php endif; ?>
         <div class="rent-status-card <?= ['Paid' => 'is-paid', 'Pending' => 'is-pending', 'Overdue' => 'is-due', 'Due' => 'is-due', 'None' => 'is-none'][$rent['state']] ?> mt-0 mb-3">
           <div>
             <div class="rent-status-label"><?= $rent['state'] === 'Paid' ? 'Rent' : 'Rent Due' ?> · <?= clean($rent['month']) ?></div>
@@ -230,11 +226,29 @@ include __DIR__ . '/../includes/header.php';
           <?= csrf_field() ?>
           <div class="mb-3">
             <label class="form-label">Payment Month</label>
+            <?php
+              // Default to the earliest month on the contract that isn't
+              // paid yet, falling back to the current calendar month if
+              // it happens to be on the list, then to the first month.
+              $defaultMonth = null;
+              foreach ($monthOptions as $monthOption) {
+                  if (!isset($paidMonths[$monthOption])) { $defaultMonth = $monthOption; break; }
+              }
+              if ($defaultMonth === null && in_array(current_billing_month(), $monthOptions, true)) {
+                  $defaultMonth = current_billing_month();
+              }
+              if ($defaultMonth === null && $monthOptions) {
+                  $defaultMonth = $monthOptions[0];
+              }
+            ?>
             <select class="form-select" name="payment_for_month" required>
-              <?php foreach ($monthOptions as $monthOption): ?>
-                <option value="<?= clean($monthOption) ?>"<?= $monthOption === current_billing_month() ? ' selected' : '' ?>><?= clean($monthOption) ?></option>
+              <?php foreach ($monthOptions as $monthOption): $isPaid = isset($paidMonths[$monthOption]); ?>
+                <option value="<?= clean($monthOption) ?>"<?= $monthOption === $defaultMonth ? ' selected' : '' ?><?= $isPaid ? ' disabled' : '' ?>><?= clean($monthOption) ?><?= $isPaid ? ' — ✓ Paid' : '' ?></option>
               <?php endforeach; ?>
             </select>
+            <?php if (!$monthOptions): ?>
+              <div class="form-text text-danger">This contract has no billable months on record — please contact the office.</div>
+            <?php endif; ?>
           </div>
           <div class="mb-3">
             <label class="form-label">Amount</label>

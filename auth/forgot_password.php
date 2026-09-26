@@ -30,7 +30,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $secondsLeft = $expiresAt ? strtotime($expiresAt) - time() : 0;
             if ($secondsLeft <= 14 * 60) {
                 $otp = (string) random_int(100000, 999999);
-                $_SESSION['demo_otp'] = $otp;
                 $_SESSION['reset_email'] = $email;
                 $_SESSION['otp_last_sent_at'] = time();
                 $expires = date('Y-m-d H:i:s', time() + 15 * 60);

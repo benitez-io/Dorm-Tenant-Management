@@ -426,6 +426,108 @@ function billing_month_options(int $monthsBack = 3, int $monthsForward = 3): arr
 }
 
 /**
+ * Every billing month a contract actually covers, from its start month
+ * through its end month inclusive, oldest first — e.g. a contract
+ * running Oct 2026 to Dec 2027 returns "October 2026" .. "December
+ * 2027". Recomputed straight from contract_start/contract_end every
+ * time it's called, so a renewal that pushes contract_end out just
+ * makes this list longer on its own — nothing else has to track it.
+ */
+/**
+ * Add exactly one calendar month to a date, clamping the day down when
+ * the target month is shorter — e.g. Jan 31 + 1 month lands on Feb 28
+ * (or 29 in a leap year), not Mar 2/3. PHP's DateInterval('P1M') does
+ * the latter by default (it overflows into the next month instead of
+ * clamping), which would silently misalign every later period for a
+ * contract that starts on a day past the 28th.
+ */
+function add_one_calendar_month(DateTimeImmutable $date): DateTimeImmutable
+{
+    $year  = (int) $date->format('Y');
+    $month = (int) $date->format('n');
+    $day   = (int) $date->format('j');
+
+    $month++;
+    if ($month > 12) {
+        $month = 1;
+        $year++;
+    }
+
+    $lastDayOfTargetMonth = (int) (new DateTimeImmutable(sprintf('%04d-%02d-01', $year, $month)))->format('t');
+    $day = min($day, $lastDayOfTargetMonth);
+
+    return $date->setDate($year, $month, $day);
+}
+
+/**
+ * Every monthly billing period a contract actually covers, oldest
+ * first — e.g. a contract running Oct 1, 2026 to Feb 1, 2027 returns
+ * exactly 4 periods (Oct 1–Nov 1, Nov 1–Dec 1, Dec 1–Jan 1, Jan 1–Feb
+ * 1), NOT 5. Each period is a half-open [start, end) span one calendar
+ * month long: the next period always starts exactly where the
+ * previous one ended, and start/end dates themselves are never counted
+ * as two separate billing months.
+ *
+ * A period is only generated while its start date is strictly before
+ * the contract's end date — the moment a period's start would land
+ * exactly on contract_end, generation stops, since contract_end is a
+ * boundary, not a month to bill for. This is what keeps Oct 1 → Feb 1
+ * at 4 payments instead of 5: naively walking calendar months from
+ * "October" through "February" inclusive over-counts by one, because
+ * contract_end's own month isn't a billable period at all.
+ *
+ * Returned as the app's canonical "Month Year" strings (one per
+ * period's start month) so this drops straight into the existing
+ * payment_for_month plumbing. Recomputed straight from
+ * contract_start/contract_end every time it's called, so a renewal
+ * that pushes contract_end out just makes this list longer on its own.
+ */
+function contract_billing_months(array $contract): array
+{
+    $months = [];
+
+    try {
+        $cursor = new DateTimeImmutable(date('Y-m-d', strtotime($contract['contract_start'])));
+        $end    = new DateTimeImmutable(date('Y-m-d', strtotime($contract['contract_end'])));
+    } catch (Throwable $e) {
+        return $months;
+    }
+
+    // A contract row that's somehow end-before-start (or end-equals-
+    // start — a zero-length term) has no billable monthly periods.
+    if ($cursor >= $end) {
+        return $months;
+    }
+
+    while ($cursor < $end) {
+        $months[] = $cursor->format('F Y');
+        $cursor   = add_one_calendar_month($cursor);
+    }
+
+    return $months;
+}
+
+
+/**
+ * The set of this tenant's billing months (from contract_billing_months)
+ * that already have a Paid row, keyed by the same "June 2026" strings
+ * for an easy isset() check when rendering the month picker.
+ */
+function tenant_paid_months(PDO $db, int $tenantId): array
+{
+    $stmt = $db->prepare("SELECT DISTINCT payment_for_month FROM payments
+                           WHERE tenant_id = ? AND payment_status = 'Paid'
+                             AND payment_for_month IS NOT NULL AND payment_for_month <> ''");
+    $stmt->execute([$tenantId]);
+    $paid = [];
+    foreach ($stmt->fetchAll(PDO::FETCH_COLUMN) as $month) {
+        $paid[$month] = true;
+    }
+    return $paid;
+}
+
+
+/**
  * Work out where this tenant stands on THIS month's rent.
  *
  * Returns:
