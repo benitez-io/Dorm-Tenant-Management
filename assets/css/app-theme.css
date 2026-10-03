@@ -104,8 +104,7 @@ div[id*="report"] {
   letter-spacing: 0.03em !important;
 }
 
-/* 6. Sidebar & Nav Link Highlights */
-.sidebar-link.active,
+/* 6. Bootstrap Nav Link Highlights; DTMS sidebar styling lives in style.css. */
 .nav-link.active:not(.nav-pills .nav-link) {
   background-color: var(--primary-color) !important;
   color: #ffffff !important;

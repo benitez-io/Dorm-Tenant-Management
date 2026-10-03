@@ -51,7 +51,7 @@ try {
     $role = strtolower((string) ($_SESSION['role'] ?? ''));
     $emptyCounts = ['tenants' => 0, 'payments' => 0, 'maintenance' => 0, 'notifications' => 0, 'announcements' => 0];
 
-    if (!$userId || !in_array($role, ['admin', 'tenant'], true)) {
+    if (!$userId || !in_array($role, ['super_admin', 'admin', 'tenant'], true)) {
         notification_json(['status' => 'success', 'counts' => normalize_notification_counts($emptyCounts)]);
     }
 
@@ -72,7 +72,7 @@ try {
 
     $counts = $emptyCounts;
 
-    if ($role === 'admin') {
+    if (in_array($role, ['super_admin', 'admin'], true)) {
         // Admin: Pending tenant approvals
         $counts['tenants'] = notification_count(
             $database,

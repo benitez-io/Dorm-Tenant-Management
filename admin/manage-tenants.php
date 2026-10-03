@@ -114,7 +114,7 @@ render_module_tabs([
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="deactivate">
                 <input type="hidden" name="tenant_id" value="<?= $t['tenant_id'] ?>">
-                <button class="btn btn-sm btn-icon btn-action-outline" title="Deactivate"><i class="bi bi-trash"></i></button>
+                <button class="btn btn-sm btn-icon btn-action-outline" title="Deactivate" aria-label="Deactivate tenant account"><i class="bi bi-slash-circle" aria-hidden="true"></i></button>
               </form>
               <?php endif; ?>
             </td>

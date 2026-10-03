@@ -19,7 +19,7 @@
   <main class="app-content">
     <div class="mobile-topbar d-lg-none">
       <button class="btn-menu-toggle" id="menuToggle" type="button" aria-label="Open menu"><i class="bi bi-list"></i></button>
-      <span class="mobile-title"><?= current_role() === 'admin' ? 'Admin Portal' : 'Tenant Portal' ?></span>
+      <span class="mobile-title"><?= is_admin_role() ? 'Admin Portal' : 'Tenant Portal' ?></span>
     </div>
     <?php if ($msg = flash('success')): ?>
       <div class="alert alert-success alert-dismissible fade show" role="alert">

@@ -53,6 +53,21 @@ function current_role(): ?string
     return $_SESSION['role'] ?? null;
 }
 
+function is_admin_role(?string $role = null): bool
+{
+    return in_array($role ?? current_role(), ['super_admin', 'admin'], true);
+}
+
+function is_super_admin(): bool
+{
+    return current_role() === 'super_admin';
+}
+
+function role_home_path(?string $role = null): string
+{
+    return is_admin_role($role) ? '/admin/dashboard.php' : '/tenant/dashboard.php';
+}
+
 function current_user_id(): ?int
 {
     return $_SESSION['user_id'] ?? null;
@@ -97,12 +112,17 @@ function require_login(): void
     static $checked = false;
     if (!$checked) {
         $checked = true;
-        $stmt = get_db()->prepare('SELECT is_active, password_changed_at FROM users WHERE user_id = ?');
+        $stmt = get_db()->prepare('SELECT is_active, password_changed_at, role FROM users WHERE user_id = ?');
         $stmt->execute([current_user_id()]);
         $row = $stmt->fetch();
         if (!$row || !$row['is_active']) {
             logout_user();
             redirect('/auth/login.php?deactivated=1');
+        }
+        if (!in_array($row['role'], ['super_admin', 'admin', 'tenant'], true)
+            || $row['role'] !== current_role()) {
+            logout_user();
+            redirect('/auth/login.php');
         }
         if ($row['password_changed_at'] !== ($_SESSION['pwd_changed_at'] ?? null)) {
             logout_user();
@@ -121,7 +141,8 @@ function require_login(): void
 function require_role(string $role): void
 {
     require_login();
-    if (current_role() !== $role) {
-        redirect(current_role() === 'admin' ? '/admin/dashboard.php' : '/tenant/dashboard.php');
+    $hasRole = $role === 'admin' ? is_admin_role() : current_role() === $role;
+    if (!$hasRole) {
+        redirect(role_home_path());
     }
 }

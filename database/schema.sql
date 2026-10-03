@@ -15,7 +15,7 @@ CREATE DATABASE dorm_tenant_system
 USE dorm_tenant_system;
 
 -- ---------------------------------------------------------------------
--- 1. USERS — login + profile for BOTH admin and tenant accounts.
+-- 1. USERS — login + profile for super admins, admins, and tenants.
 --    (One login system, one table, separated by `role`.)
 -- ---------------------------------------------------------------------
 CREATE TABLE users (
@@ -30,7 +30,7 @@ CREATE TABLE users (
   password_changed_at DATETIME DEFAULT NULL,
   age           TINYINT UNSIGNED DEFAULT NULL,
   phone         VARCHAR(20)  DEFAULT NULL,
-  role          ENUM('admin','tenant') NOT NULL DEFAULT 'tenant',
+  role          ENUM('super_admin','admin','tenant') NOT NULL DEFAULT 'tenant',
   is_active     BOOLEAN NOT NULL DEFAULT TRUE,
   last_login    DATETIME DEFAULT NULL,
   date_created  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

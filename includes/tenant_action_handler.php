@@ -145,8 +145,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Early/forced end of tenancy — the lease no longer runs its natural course.
             $db->prepare("UPDATE contracts SET contract_status = 'Terminated' WHERE tenant_id = ? AND contract_status IN ('Active','Expiring Soon')")->execute([$tenantId]);
             $db->commit();
-            log_activity($db, 'tenant_evicted', $tenant['first_name'] . ' ' . $tenant['last_name'] . ' was marked as evicted', $tenantId);
-            flash('success', $tenant['first_name'] . ' marked as evicted.');
+            log_activity($db, 'tenant_evicted', $tenant['first_name'] . ' ' . $tenant['last_name'] . ' had their lease terminated', $tenantId);
+            flash('success', 'Lease terminated for ' . $tenant['first_name'] . '. Their room is now available again.');
         } catch (Exception $e) {
             $db->rollBack();
             flash('error', 'Update failed. Please try again.');

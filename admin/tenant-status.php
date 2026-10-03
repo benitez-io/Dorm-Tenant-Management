@@ -5,6 +5,7 @@ require_role('admin');
 $db = get_db();
 $selfPath = '/admin/tenant-status.php';
 require __DIR__ . '/../includes/tenant_action_handler.php';
+$statusLabels = ['Evicted' => 'Lease Terminated'];
 
 // Stat counts reflect ALL approved tenants, not just the current page.
 $counts = ['Active' => 0, 'Pending' => 0, 'Evicted' => 0, 'Checked Out' => 0];
@@ -46,7 +47,7 @@ render_module_tabs([
   <div class="stat-card"><div class="stat-card-body"><div class="stat-label">Active</div><div class="stat-value text-success"><?= $counts['Active'] ?></div></div><div class="stat-icon stat-icon-outline"><i class="bi bi-check-lg"></i></div></div>
   <div class="stat-card"><div class="stat-card-body"><div class="stat-label">Pending Check-in</div><div class="stat-value"><?= $counts['Pending'] ?></div></div><div class="stat-icon stat-icon-outline"><i class="bi bi-clock-fill"></i></div></div>
   <div class="stat-card"><div class="stat-card-body"><div class="stat-label">Checked Out</div><div class="stat-value"><?= $counts['Checked Out'] ?></div></div><div class="stat-icon stat-icon-outline"><i class="bi bi-box-arrow-in-right"></i></div></div>
-  <div class="stat-card"><div class="stat-card-body"><div class="stat-label">Evicted</div><div class="stat-value text-danger"><?= $counts['Evicted'] ?></div></div><div class="stat-icon stat-icon-outline"><i class="bi bi-x-lg"></i></div></div>
+  <div class="stat-card"><div class="stat-card-body"><div class="stat-label">Lease Terminated</div><div class="stat-value text-danger"><?= $counts['Evicted'] ?></div></div><div class="stat-icon stat-icon-outline"><i class="bi bi-slash-circle"></i></div></div>
 </div>
 
 <div class="panel mt-2">
@@ -57,8 +58,8 @@ render_module_tabs([
       <button class="btn btn-sm btn-action-outline dropdown-toggle" type="button" data-bs-toggle="dropdown"><i class="bi bi-eraser-fill"></i> Clear</button>
       <ul class="dropdown-menu dropdown-menu-end">
         <li><h6 class="dropdown-header">Clear from this view only</h6></li>
-        <?php foreach (['Active', 'Pending', 'Checked Out', 'Evicted'] as $s): ?>
-          <li><form method="post" onsubmit="return confirm('Clear <?= clean($s) ?> tenants from this view? They stay in the database for reports.');"><?= csrf_field() ?><input type="hidden" name="action" value="clear_view"><input type="hidden" name="page" value="status"><input type="hidden" name="filter" value="<?= clean($s) ?>"><button class="dropdown-item" type="submit">Clear <?= clean($s) ?> only</button></form></li>
+        <?php foreach (['Active', 'Pending', 'Checked Out', 'Evicted'] as $s): $label = $statusLabels[$s] ?? $s; ?>
+          <li><form method="post" onsubmit="return confirm('Clear <?= clean($label) ?> tenants from this view? They stay in the database for reports.');"><?= csrf_field() ?><input type="hidden" name="action" value="clear_view"><input type="hidden" name="page" value="status"><input type="hidden" name="filter" value="<?= clean($s) ?>"><button class="dropdown-item" type="submit">Clear <?= clean($label) ?> only</button></form></li>
         <?php endforeach; ?>
         <li><hr class="dropdown-divider"></li>
         <li><form method="post" onsubmit="return confirm('Clear ALL tenants from this view? They stay in the database for reports.');"><?= csrf_field() ?><input type="hidden" name="action" value="clear_view"><input type="hidden" name="page" value="status"><input type="hidden" name="filter" value="all"><button class="dropdown-item" type="submit">Clear all</button></form></li>
@@ -92,7 +93,7 @@ render_module_tabs([
             </div>
           </td>
           <td><?= $t['room_number'] ? '<i class="bi bi-house-door-fill"></i> Room ' . clean($t['room_number']) : '<span class="text-muted">Unassigned</span>' ?></td>
-          <td><span class="badge badge-<?= status_badge_class($t['status']) ?>"><?= clean($t['status']) ?></span></td>
+          <td><span class="badge badge-<?= status_badge_class($t['status']) ?>"><?= clean($statusLabels[$t['status']] ?? $t['status']) ?></span></td>
           <td class="text-muted small"><i class="bi bi-calendar-event"></i> <?= $t['checkin_date'] ? clean(date('n/j/Y', strtotime($t['checkin_date']))) : '—' ?><?= $t['checkout_date'] ? ' – ' . clean(date('n/j/Y', strtotime($t['checkout_date']))) : '' ?></td>
           <td class="text-muted small"><?= clean($details) ?></td>
           <td class="text-end">
@@ -100,7 +101,7 @@ render_module_tabs([
               <form method="post" class="d-inline"><?= csrf_field() ?><input type="hidden" name="action" value="checkin"><input type="hidden" name="tenant_id" value="<?= $t['tenant_id'] ?>"><button class="btn btn-sm btn-action-primary d-inline-flex align-items-center justify-content-center">Check In</button></form>
             <?php elseif ($t['status'] === 'Active'): ?>
               <form method="post" class="d-inline" onsubmit="return confirm('Check out this tenant?');"><?= csrf_field() ?><input type="hidden" name="action" value="checkout"><input type="hidden" name="tenant_id" value="<?= $t['tenant_id'] ?>"><button class="btn btn-sm btn-action-outline d-inline-flex align-items-center justify-content-center">Check Out</button></form>
-              <form method="post" class="d-inline" onsubmit="return confirm('Mark this tenant as evicted? This frees up their room.');"><?= csrf_field() ?><input type="hidden" name="action" value="evict"><input type="hidden" name="tenant_id" value="<?= $t['tenant_id'] ?>"><button class="btn btn-sm btn-outline-danger">Evict</button></form>
+              <form method="post" class="d-inline" onsubmit="return confirm('Terminate this lease? This frees up the tenant\'s room.');"><?= csrf_field() ?><input type="hidden" name="action" value="evict"><input type="hidden" name="tenant_id" value="<?= $t['tenant_id'] ?>"><button class="btn btn-sm btn-action-reject"><i class="bi bi-file-earmark-x" aria-hidden="true"></i> Terminate Lease</button></form>
             <?php else: ?>
               <span class="text-muted small">—</span>
             <?php endif; ?>

@@ -15,7 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $email = str_input($_POST, 'email');
         $password = str_input($_POST, 'password', '', false);
         $confirmPassword = str_input($_POST, 'confirm_password', '', false);
-        $requestedRole = $_POST['role'] ?? '';
+        $requestedRole = str_input($_POST, 'role');
         $role = in_array($requestedRole, ['admin', 'tenant'], true) ? $requestedRole : 'tenant';
         $contactNumber = str_input($_POST, 'contact_number');
         $emergencyName = str_input($_POST, 'emergency_contact_name');
@@ -25,7 +25,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $emergencyPhoneInvalid = $cleanEmergencyPhone !== ''
           && (strlen($cleanEmergencyPhone) !== 10 || $cleanEmergencyPhone[0] !== '9');
 
-        if ($first === '' || $last === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || !in_array($requestedRole, ['admin', 'tenant'], true) || password_policy_error($password) !== null || $password !== $confirmPassword || $contactNumber === '' || !preg_match('/^[0-9+() .-]{7,20}$/', $contactNumber) || $emergencyPhoneInvalid) {
+        if ($requestedRole === 'admin' && !is_super_admin()) {
+            flash('error', 'Only Super Admins can register administrator accounts.');
+        } elseif ($first === '' || $last === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || !in_array($requestedRole, ['admin', 'tenant'], true) || password_policy_error($password) !== null || $password !== $confirmPassword || $contactNumber === '' || !preg_match('/^[0-9+() .-]{7,20}$/', $contactNumber) || $emergencyPhoneInvalid) {
             flash('error', 'Please fill every field correctly (password needs at least 8 characters).');
         } else {
             $check = $db->prepare('SELECT user_id FROM users WHERE email = ?');
@@ -34,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 flash('error', 'That email is already registered.');
             } else {
                  $db->prepare('INSERT INTO users (first_name, last_name, email, password_hash, phone, role) VALUES (?, ?, ?, ?, ?, ?)')
-                   ->execute([$first, $last, $email, password_hash($password, PASSWORD_BCRYPT), preg_replace('/\D+/', '', $contactNumber), $role]);
+                   ->execute([$first, $last, $email, password_hash($password, PASSWORD_DEFAULT), preg_replace('/\D+/', '', $contactNumber), $role]);
                  $newId = (int) $db->lastInsertId();
                  if ($role === 'tenant') {
                      $cleanPhone = preg_replace('/\D+/', '', $contactNumber);
@@ -96,6 +98,7 @@ render_module_tabs([
         <div class="mb-3"><label class="form-label">Emergency Contact Phone</label><input type="tel" class="form-control" name="emergency_contact_phone" placeholder="912 123 1234"></div>
         <button class="btn btn-sm btn-action-primary w-100 rounded-pill fw-bold">Save User</button>
       </section>
+      <?php if (is_super_admin()): ?>
       <section class="registration-card role-selection-card">
         <div class="registration-card-heading"><span class="registration-icon"><i class="bi bi-shield-check"></i></span><h5>Identify Role</h5></div>
         <p class="text-muted small mb-4">Select the appropriate role for this user account.</p>
@@ -104,6 +107,10 @@ render_module_tabs([
           <input type="radio" name="role" id="admin_role_tenant" value="tenant" class="visually-hidden" checked><label for="admin_role_tenant" class="role-option-card"><span class="custom-radio-dot"></span><span class="role-icon-box"><i class="bi bi-person"></i></span><span><strong>Tenant</strong><small>Portal access for rooms, payments, and requests.</small></span></label>
         </div>
       </section>
+      <?php else: ?>
+      <input type="hidden" name="role" value="tenant">
+      <p class="text-muted small">Only Super Admins can register administrator accounts. This form will create a tenant account.</p>
+      <?php endif; ?>
     </div>
   </form>
 </div>

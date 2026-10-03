@@ -37,14 +37,10 @@ $tenantLinks = [
 <nav class="sidebar no-scrollbar" id="sidebar">
   <div class="sidebar-brand">
     <span class="brand-icon"><i class="bi bi-mortarboard-fill"></i></span>
-    <?php if ($role === 'admin'): ?>
-      <div class="sidebar-brand-text"><div class="sidebar-brand-title">Dorm Tenant</div><div class="sidebar-brand-subtitle">Management System</div></div>
-    <?php else: ?>
-      <div class="brand-subtitle">Tenant Portal</div>
-    <?php endif; ?>
+    <div class="sidebar-brand-text"><div class="sidebar-brand-title">Dorm Tenant</div><div class="sidebar-brand-subtitle">Management System</div></div>
   </div>
 
-  <?php if ($role === 'admin'): ?>
+  <?php if (is_admin_role($role)): ?>
   <div class="topbar-toggle d-lg-none">
     <a class="pill-active" href="<?= BASE_URL ?>/admin/dashboard.php">Admin Dashboard</a>
   </div>
@@ -55,7 +51,7 @@ $tenantLinks = [
   <?php endif; ?>
 
   <div class="sidebar-links">
-  <?php if ($role === 'admin'): ?>
+  <?php if (is_admin_role($role)): ?>
     <div class="sidebar-section">Overview</div>
     <a class="sidebar-link <?= active('/admin/dashboard.php') ?>" href="<?= BASE_URL ?>/admin/dashboard.php"><span class="icon-wrapper nav-icon"><i class="bi bi-grid-1x2-fill"></i></span> Dashboard</a>
     <?php $sectionLabels = [0 => 'Management', 3 => 'Finance', 4 => 'Operations', 6 => 'Reports']; ?>

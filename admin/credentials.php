@@ -7,16 +7,34 @@ $db = get_db();
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_verify();
     $action = $_POST['action'] ?? '';
+    $getTargetRole = static function (int $userId) use ($db): ?string {
+        $statement = $db->prepare('SELECT role FROM users WHERE user_id = ?');
+        $statement->execute([$userId]);
+        $role = $statement->fetchColumn();
+        return is_string($role) ? $role : null;
+    };
+    $canManageTarget = static function (?string $targetRole): bool {
+        return $targetRole !== null
+            && $targetRole !== 'super_admin'
+            && (is_super_admin() || $targetRole === 'tenant');
+    };
 
     if ($action === 'update') {
         $id    = (int) ($_POST['user_id'] ?? 0);
+      $targetRole = $getTargetRole($id);
         $first = str_input($_POST, 'first_name');
         $last  = str_input($_POST, 'last_name');
         $email = str_input($_POST, 'email');
-        $role  = in_array($_POST['role'] ?? '', ['admin', 'tenant'], true) ? $_POST['role'] : 'tenant';
+      $requestedRole = str_input($_POST, 'role');
+      $allowedRoles = is_super_admin() ? ['admin', 'tenant'] : ['tenant'];
+      $role = in_array($requestedRole, $allowedRoles, true) ? $requestedRole : '';
         $newPassword = str_input($_POST, 'new_password', '', false);
 
-        if ($first === '' || $last === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        if (!$canManageTarget($targetRole)) {
+            flash('error', 'You are not allowed to edit this account.');
+        } elseif ($role === '') {
+            flash('error', 'Only Super Admins can assign administrator accounts.');
+        } elseif ($first === '' || $last === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             flash('error', 'Please fill every field correctly.');
         } elseif ($newPassword !== '' && password_policy_error($newPassword) !== null) {
           flash('error', password_policy_error($newPassword));
@@ -40,7 +58,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'toggle_active') {
         $id = (int) ($_POST['user_id'] ?? 0);
-        if ($id === current_user_id()) {
+        if (!$canManageTarget($getTargetRole($id))) {
+            flash('error', 'You are not allowed to change this account status.');
+        } elseif ($id === current_user_id()) {
             flash('error', "You can't deactivate your own account while logged in.");
         } else {
             $db->prepare('UPDATE users SET is_active = NOT is_active WHERE user_id = ?')->execute([$id]);
@@ -50,8 +70,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if ($action === 'delete') {
         $id = (int) ($_POST['user_id'] ?? 0);
-        if ($id === current_user_id()) {
+        if (!$canManageTarget($getTargetRole($id))) {
+            flash('error', 'You are not allowed to delete this account.');
+        } elseif ($id === current_user_id()) {
             flash('error', "You can't delete your own account while logged in.");
+      } elseif (str_input($_POST, 'confirm_delete') !== 'DELETE') {
+        flash('error', 'Type DELETE exactly to confirm account deletion.');
         } else {
             try {
                 $db->beginTransaction();
@@ -119,10 +143,11 @@ render_module_tabs([
               </div>
             </td>
             <td class="text-muted">••••••••</td>
-            <td><span class="badge badge-<?= $u['role'] === 'admin' ? 'maroon' : 'info' ?>"><?= clean(ucfirst($u['role'])) ?></span></td>
+            <td><span class="badge badge-<?= is_admin_role((string) $u['role']) ? 'maroon' : 'info' ?>"><?= clean(ucwords(str_replace('_', ' ', $u['role']))) ?></span></td>
             <td class="text-muted small"><?= $u['last_login'] ? clean(date('n/j/Y g:i A', strtotime($u['last_login']))) : 'Never' ?></td>
             <td><span class="badge badge-<?= $u['is_active'] ? 'success' : 'secondary' ?>"><?= $u['is_active'] ? 'Active' : 'Inactive' ?></span></td>
             <td class="text-end">
+              <?php if ($u['role'] !== 'super_admin' && (is_super_admin() || $u['role'] === 'tenant')): ?>
               <button type="button" class="btn btn-sm btn-icon btn-action-outline" title="Edit" data-bs-toggle="modal" data-bs-target="#editUserModal"
                 data-id="<?= $u['user_id'] ?>" data-first="<?= clean($u['first_name']) ?>" data-last="<?= clean($u['last_name']) ?>"
                 data-email="<?= clean($u['email']) ?>" data-role="<?= clean($u['role']) ?>"><i class="bi bi-pencil-square"></i></button>
@@ -130,15 +155,11 @@ render_module_tabs([
                 <?= csrf_field() ?>
                 <input type="hidden" name="action" value="toggle_active">
                 <input type="hidden" name="user_id" value="<?= $u['user_id'] ?>">
-                <button class="btn btn-sm btn-icon btn-action-outline" title="<?= $u['is_active'] ? 'Deactivate' : 'Reactivate' ?>"><?= $u['is_active'] ? '<i class="bi bi-slash-circle"></i>' : '<i class="bi bi-check-circle-fill"></i>' ?></button>
+                <button class="btn btn-sm btn-icon btn-action-outline" title="<?= $u['is_active'] ? 'Deactivate' : 'Reactivate' ?>" aria-label="<?= $u['is_active'] ? 'Deactivate' : 'Reactivate' ?> account"><?= $u['is_active'] ? '<i class="bi bi-slash-circle" aria-hidden="true"></i>' : '<i class="bi bi-check-circle-fill" aria-hidden="true"></i>' ?></button>
               </form>
               <?php if ((int) $u['user_id'] !== current_user_id()): ?>
-              <form method="post" class="d-inline" onsubmit="return confirm('Permanently delete this account? Its tenant records, payments, contracts, and maintenance history will also be deleted. This cannot be undone.');">
-                <?= csrf_field() ?>
-                <input type="hidden" name="action" value="delete">
-                <input type="hidden" name="user_id" value="<?= $u['user_id'] ?>">
-                <button class="btn btn-sm btn-icon btn-action-outline text-danger" title="Delete account" aria-label="Delete account"><i class="bi bi-trash3"></i></button>
-              </form>
+              <button type="button" class="btn btn-sm btn-icon btn-action-outline text-danger delete-user-btn" data-userid="<?= (int) $u['user_id'] ?>" title="Delete account" aria-label="Delete account"><i class="bi bi-trash3" aria-hidden="true"></i></button>
+              <?php endif; ?>
               <?php endif; ?>
             </td>
           </tr>
@@ -172,11 +193,39 @@ render_module_tabs([
             <label class="form-label">Role</label>
             <select class="form-select" name="role" id="edit_role">
               <option value="tenant">Tenant</option>
-              <option value="admin">Administrator</option>
+              <?php if (is_super_admin()): ?><option value="admin">Administrator</option><?php endif; ?>
             </select>
           </div>
         </div>
         <div class="modal-footer"><button class="btn btn-sm btn-light" data-bs-dismiss="modal" type="button">Cancel</button><button class="btn btn-sm btn-action-primary">Save Changes</button></div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Secure Delete Confirmation Modal -->
+<div class="modal fade" id="deleteConfirmModal" tabindex="-1" aria-labelledby="deleteConfirmModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-danger text-white">
+        <h5 class="modal-title" id="deleteConfirmModalLabel"><i class="bi bi-exclamation-triangle-fill me-2" aria-hidden="true"></i>Confirm Permanent Deletion</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="deleteForm" method="post" action="<?= BASE_URL ?>/admin/credentials.php">
+        <?= csrf_field() ?>
+        <input type="hidden" name="action" value="delete">
+        <div class="modal-body">
+          <input type="hidden" name="user_id" id="deleteUserId">
+          <p class="text-muted small mb-3">Permanently delete this account? Its tenant records, payments, contracts, and maintenance history will also be deleted. This cannot be undone.</p>
+          <div class="mb-3">
+            <label for="confirmDeleteInput" class="form-label small fw-bold">To confirm, type <span class="text-danger">DELETE</span> below:</label>
+            <input type="text" class="form-control" name="confirm_delete" id="confirmDeleteInput" placeholder="Type DELETE to enable" autocomplete="off" required>
+          </div>
+        </div>
+        <div class="modal-footer bg-light">
+          <button type="button" class="btn btn-secondary btn-sm rounded-pill px-3" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" id="confirmDeleteBtn" class="btn btn-danger btn-sm rounded-pill px-3" disabled>Delete Account</button>
+        </div>
       </form>
     </div>
   </div>
@@ -203,6 +252,30 @@ document.addEventListener('DOMContentLoaded', function () {
     fields.last.value = btn.dataset.last || '';
     fields.email.value = btn.dataset.email || '';
     fields.role.value = btn.dataset.role || 'tenant';
+  });
+
+  const deleteModal = document.getElementById('deleteConfirmModal');
+  if (!deleteModal) return;
+
+  const deleteUserIdInput = document.getElementById('deleteUserId');
+  const confirmInput = document.getElementById('confirmDeleteInput');
+  const confirmBtn = document.getElementById('confirmDeleteBtn');
+  document.querySelectorAll('.delete-user-btn').forEach(function (button) {
+    button.addEventListener('click', function () {
+      deleteUserIdInput.value = this.getAttribute('data-userid') || '';
+      confirmInput.value = '';
+      confirmBtn.disabled = true;
+      bootstrap.Modal.getOrCreateInstance(deleteModal).show();
+    });
+  });
+
+  confirmInput.addEventListener('input', function () {
+    confirmBtn.disabled = this.value.trim() !== 'DELETE';
+  });
+
+  deleteModal.addEventListener('hidden.bs.modal', function () {
+    document.getElementById('deleteForm').reset();
+    confirmBtn.disabled = true;
   });
 });
 </script>";
