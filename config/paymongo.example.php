@@ -30,5 +30,5 @@ define('PAYMONGO_WEBHOOK_SECRET', 'whsec_REPLACE_ME');
 /** True once real test/live keys have been filled in above. */
 function paymongo_configured(): bool
 {
-    return PAYMONGO_SECRET_KEY !== 'sk_test_REPLACE_ME' && PAYMONGO_SECRET_KEY !== '';
+    return PAYMONGO_SECRET_KEY !== '' && PAYMONGO_SECRET_KEY !== '';
 }

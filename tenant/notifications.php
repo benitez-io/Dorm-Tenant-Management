@@ -16,14 +16,19 @@ if ($tenant['room_id']) {
     $room = $stmt->fetch();
 }
 
+mark_notifications_seen($db, current_user_id(), (int) $tenant['tenant_id'], $room['room_number'] ?? '__none__');
+
 $stmt = $db->prepare("
-    SELECT * FROM notifications
-    WHERE target_type = 'all'
-       OR (target_type = 'tenant' AND target_value = ?)
-       OR (target_type = 'room' AND FIND_IN_SET(?, REPLACE(target_value, ' ', '')))
-    ORDER BY date_sent DESC
+        SELECT n.*, nr.seen_at, COALESCE(nr.is_resolved, 0) AS is_resolved,
+          COALESCE(nr.is_dismissed, 0) AS is_dismissed
+    FROM notifications n
+    LEFT JOIN notification_reads nr ON nr.notification_id = n.notification_id AND nr.user_id = ?
+    WHERE n.target_type = 'all'
+       OR (n.target_type = 'tenant' AND n.target_value = ?)
+       OR (n.target_type = 'room' AND FIND_IN_SET(?, REPLACE(n.target_value, ' ', '')))
+    ORDER BY n.date_sent DESC
 ");
-$stmt->execute([$tenant['tenant_id'], $room['room_number'] ?? '__none__']);
+$stmt->execute([current_user_id(), $tenant['tenant_id'], $room['room_number'] ?? '__none__']);
 $notifications = $stmt->fetchAll();
 
 $typeIcon = ['Announcement' => '<i class="bi bi-megaphone-fill"></i>', 'Payment Reminder' => '<i class="bi bi-credit-card-fill"></i>', 'Contract Expiry Alert' => '<i class="bi bi-calendar2-warning"></i>'];
@@ -31,26 +36,23 @@ $typeTint = ['Announcement' => '', 'Payment Reminder' => 'tint-amber', 'Contract
 
 $pageTitle = 'Notifications';
 include __DIR__ . '/../includes/header.php';
+require_once __DIR__ . '/../includes/page_header.php';
 ?>
-<div class="page-header"><div><h1>Notifications</h1><p class="text-muted">Announcements, payment reminders, and contract expiry alerts.</p></div></div>
+<?php render_page_header('bi-bell-fill', 'Notifications', 'Announcements, payment reminders, and contract expiry alerts.', null, 'Tenant Portal', '/tenant/dashboard.php'); ?>
 
 <div class="panel">
   <?php if (!$notifications): ?>
     <p class="text-muted py-4 text-center">Nothing here yet — you're all caught up.</p>
   <?php endif; ?>
   <?php foreach ($notifications as $n): ?>
-    <div class="notification-item <?= $typeTint[$n['type']] ?? '' ?>">
+    <div class="notification-item <?= $typeTint[$n['type']] ?? '' ?> <?= $n['seen_at'] ? 'notification-seen' : 'notification-unseen' ?>">
       <div class="notification-icon"><?= $typeIcon[$n['type']] ?? '<i class="bi bi-bell-fill"></i>' ?></div>
       <div class="flex-grow-1">
         <strong><?= clean($n['subject']) ?></strong>
         <span class="badge badge-secondary ms-2"><?= clean($n['type']) ?></span>
         <p class="text-muted small mb-1 mt-1"><?= clean($n['message']) ?></p>
         <div class="text-muted small"><?= clean(date('F j, Y g:i A', strtotime($n['date_sent']))) ?></div>
-        <?php if ($n['type'] === 'Contract Expiry Alert'): ?>
-          <a href="<?= BASE_URL ?>/tenant/services.php" class="btn btn-sm btn-action-primary mt-2">
-            <i class="bi bi-file-earmark-text"></i> View My Room &amp; Contract
-          </a>
-        <?php endif; ?>
+        <?php if ($n['seen_at']): ?><div class="text-muted small mt-1">Seen: <?= clean(date('M j, Y g:i A', strtotime($n['seen_at']))) ?></div><?php endif; ?>
       </div>
     </div>
   <?php endforeach; ?>

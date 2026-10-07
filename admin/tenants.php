@@ -118,6 +118,7 @@ render_module_tabs([
   ['key' => 'registration', 'label' => 'Registration & Approval', 'href' => '/admin/tenants.php'],
   ['key' => 'status', 'label' => 'Track Status', 'href' => '/admin/tenant-status.php'],
   ['key' => 'checkin', 'label' => 'Check-in / Check-out', 'href' => '/admin/checkinout.php'],
+  ['key' => 'reservations', 'label' => 'Reservations', 'href' => '/admin/reservations.php'],
 ], 'registration');
 
 $statusPills = [
@@ -154,7 +155,7 @@ $statusPills = [
     </div>
   <?php else: ?>
   <div class="table-responsive">
-    <table class="table app-table align-middle">
+    <table class="table app-table tenant-management-table align-middle">
       <thead><tr><th>Applicant</th><th>Contact</th><th>Room</th><th>Applied</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
       <tbody>
       <?php foreach ($applications as $p): ?>

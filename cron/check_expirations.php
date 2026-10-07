@@ -25,6 +25,14 @@ $db = get_db();
 $systemUserId = 1; // the default admin seeded in schema.sql — used as the "sender" of automated alerts
 $sentCount = 0;
 
+function create_notification_once(PDO $db, int $senderId, string $type, string $subject, string $message, int $tenantId, string $sourceKey): bool
+{
+    $statement = $db->prepare("INSERT IGNORE INTO notifications (sender_id, type, subject, message, target_type, target_value, source_key)
+        VALUES (?, ?, ?, ?, 'tenant', ?, ?)");
+    $statement->execute([$senderId, $type, $subject, $message, $tenantId, $sourceKey]);
+    return $statement->rowCount() === 1;
+}
+
 // ---- 0) Roll contract statuses forward --------------------------------
 // Leases that ran past their end date become 'Expired', ones inside the
 // 30-day window become 'Expiring Soon'. The app does this on page load
@@ -47,12 +55,10 @@ foreach ($stmt->fetchAll() as $row) {
              . date('F j, Y', strtotime($row['contract_end']))
              . '. Please visit the office to renew.';
 
-    $db->prepare("INSERT INTO notifications (sender_id, type, subject, message, target_type, target_value)
-                  VALUES (?, 'Contract Expiry Alert', ?, ?, 'tenant', ?)")
-       ->execute([$systemUserId, $subject, $message, $row['tenant_id']]);
-
-    send_email_alert($row['email'], $row['first_name'], $subject, email_template($subject, $message));
-    $sentCount++;
+    if (create_notification_once($db, $systemUserId, 'Contract Expiry Alert', $subject, $message, (int) $row['tenant_id'], 'contract-expiring-' . $row['contract_id'] . '-' . $row['contract_end'])) {
+        send_email_alert($row['email'], $row['first_name'], $subject, email_template($subject, $message));
+        $sentCount++;
+    }
 }
 
 // ---- 1b) Contracts that expired yesterday -----------------------------
@@ -73,12 +79,10 @@ foreach ($expiredStmt->fetchAll() as $row) {
              . date('F j, Y', strtotime($row['contract_end']))
              . '. You can request a renewal from My Room & Contract in your portal, or visit the office to arrange moving out.';
 
-    $db->prepare("INSERT INTO notifications (sender_id, type, subject, message, target_type, target_value)
-                  VALUES (?, 'Contract Expiry Alert', ?, ?, 'tenant', ?)")
-       ->execute([$systemUserId, $subject, $message, $row['tenant_id']]);
-
-    send_email_alert($row['email'], $row['first_name'], $subject, email_template($subject, $message));
-    $sentCount++;
+    if (create_notification_once($db, $systemUserId, 'Contract Expiry Alert', $subject, $message, (int) $row['tenant_id'], 'contract-expired-' . $row['contract_id'] . '-' . $row['contract_end'])) {
+        send_email_alert($row['email'], $row['first_name'], $subject, email_template($subject, $message));
+        $sentCount++;
+    }
 }
 
 // ---- 2) Payments that are now overdue ----------------------------------
@@ -90,20 +94,22 @@ $stmt2 = $db->query("
     WHERE p.payment_status = 'Pending' AND p.due_date < CURDATE()
 ");
 foreach ($stmt2->fetchAll() as $row) {
-    $db->prepare("UPDATE payments SET payment_status = 'Overdue', reminder_sent = TRUE WHERE payment_id = ?")
-       ->execute([$row['payment_id']]);
+    $updated = $db->prepare("UPDATE payments SET payment_status = 'Overdue', reminder_sent = TRUE WHERE payment_id = ? AND payment_status = 'Pending'");
+    $updated->execute([$row['payment_id']]);
+    if ($updated->rowCount() !== 1) {
+        continue;
+    }
+    log_action('payment_overdue', 'Payment #' . $row['payment_id'] . ' changed to Overdue by expiration check');
 
     $subject = 'Payment overdue — action needed';
     $message = "Hi {$row['first_name']}, your payment due on "
              . date('F j, Y', strtotime($row['due_date']))
              . ' is now overdue. Please settle it as soon as you can.';
 
-    $db->prepare("INSERT INTO notifications (sender_id, type, subject, message, target_type, target_value)
-                  VALUES (?, 'Payment Reminder', ?, ?, 'tenant', ?)")
-       ->execute([$systemUserId, $subject, $message, $row['tenant_id']]);
-
-    send_email_alert($row['email'], $row['first_name'], $subject, email_template($subject, $message));
-    $sentCount++;
+    if (create_notification_once($db, $systemUserId, 'Payment Reminder', $subject, $message, (int) $row['tenant_id'], 'payment-overdue-' . $row['payment_id'])) {
+        send_email_alert($row['email'], $row['first_name'], $subject, email_template($subject, $message));
+        $sentCount++;
+    }
 }
 
 echo '[' . date('Y-m-d H:i:s') . "] Expiration check complete — {$sentCount} alert(s) generated." . PHP_EOL;

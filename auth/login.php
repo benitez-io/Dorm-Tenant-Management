@@ -24,14 +24,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $stmt = get_db()->prepare('SELECT * FROM users WHERE email = ?');
     $stmt->execute([$oldEmail]);
-    $user = $stmt->fetch();
+    $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-     $valid_password = password_verify($password, $user['password_hash']) 
-    || ($oldEmail === 'admin@dorm.edu' && $password === 'Admin@123')
-    || ($oldEmail === 'superadmin@dorm.edu' && $password === 'superAdmin@123');
+    $validPassword = is_array($user)
+      && isset($user['password_hash'])
+      && is_string($user['password_hash'])
+      && password_verify($password, $user['password_hash']);
 
-if (!$user || !$valid_password) {
-    $errors[] = 'Incorrect email or password.';
+  if (!$validPassword) {
+    $errors[] = 'Invalid email or password.';
     } elseif (!$user['is_active']) {
         $errors[] = 'This account has been deactivated. Please contact the administrator.';
     } elseif (!in_array($user['role'], ['super_admin', 'admin', 'tenant'], true)) {
@@ -103,6 +104,7 @@ include __DIR__ . '/../includes/header.php';
           <a href="<?= BASE_URL ?>/auth/register.php" class="fw-bold text-maroon text-decoration-none d-flex align-items-center gap-1"><i class="bi bi-person-plus"></i> Register New Account</a>
           <span class="xs-text"><i class="bi bi-clock me-1"></i> Session expires after 30 min</span>
         </div>
+        <div class="text-center mt-2"><a href="<?= BASE_URL ?>/report_bug.php" class="small text-muted text-decoration-none">Report an Issue</a></div>
       </form>
     </div>
   </div>

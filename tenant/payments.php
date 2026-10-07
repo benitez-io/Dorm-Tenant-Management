@@ -114,6 +114,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
            ->execute([$contract['contract_id'], $tenant['tenant_id'], $amount, $month, $payMethod['label']]);
         $paymentId = (int) $db->lastInsertId();
         $db->commit();
+        log_action('payment_initiated', 'Tenant #' . $tenant['tenant_id'] . ' started payment #' . $paymentId . ' of ' . peso($amount) . ' for ' . $month);
     } catch (Throwable $e) {
         $db->rollBack();
         flash('error', 'Could not start the payment. Please try again.');
@@ -205,8 +206,9 @@ $history = $history->fetchAll();
 
 $pageTitle = 'Payments';
 include __DIR__ . '/../includes/header.php';
+require_once __DIR__ . '/../includes/page_header.php';
 ?>
-<div class="page-header"><div><h1>Payments</h1></div></div>
+<?php render_page_header('bi-credit-card-fill', 'Payments', 'View rent status, make a payment, and review your payment history.', null, 'Tenant Portal', '/tenant/dashboard.php'); ?>
 
 <div class="row g-4">
   <div class="col-lg-5">

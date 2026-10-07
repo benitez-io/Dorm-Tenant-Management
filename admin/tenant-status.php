@@ -6,11 +6,36 @@ $db = get_db();
 $selfPath = '/admin/tenant-status.php';
 require __DIR__ . '/../includes/tenant_action_handler.php';
 $statusLabels = ['Evicted' => 'Lease Terminated'];
+$search = str_input($_GET, 'q');
+$statusFilter = str_input($_GET, 'status', 'all');
+$statusOptions = ['all', 'Active', 'Pending', 'Checked Out', 'Evicted'];
+if (!in_array($statusFilter, $statusOptions, true)) {
+  $statusFilter = 'all';
+}
 
 // Stat counts reflect ALL approved tenants, not just the current page.
 $counts = ['Active' => 0, 'Pending' => 0, 'Evicted' => 0, 'Checked Out' => 0];
-$countRows = $db->query("SELECT status, COUNT(*) c FROM tenants WHERE approval_status = 'Approved' GROUP BY status")->fetchAll();
+$countRows = $db->query("SELECT status, COUNT(*) c FROM tenants
+  WHERE approval_status = 'Approved'
+    AND tenant_id NOT IN (SELECT tenant_id FROM dismissed_records WHERE page = 'status')
+  GROUP BY status")->fetchAll();
 foreach ($countRows as $row) { $counts[$row['status']] = (int) $row['c']; }
+
+$where = [
+  "t.approval_status = 'Approved'",
+  "t.tenant_id NOT IN (SELECT tenant_id FROM dismissed_records WHERE page = 'status')",
+];
+$params = [];
+if ($statusFilter !== 'all') {
+  $where[] = 't.status = ?';
+  $params[] = $statusFilter;
+}
+if ($search !== '') {
+  $where[] = '(u.first_name LIKE ? OR u.last_name LIKE ? OR u.email LIKE ? OR r.room_number LIKE ?)';
+  $like = '%' . $search . '%';
+  array_push($params, $like, $like, $like, $like);
+}
+$whereSql = 'WHERE ' . implode(' AND ', $where);
 
 $result = paginate(
     $db,
@@ -19,11 +44,14 @@ $result = paginate(
      FROM tenants t
      JOIN users u ON u.user_id = t.user_id
      LEFT JOIN dorm_rooms r ON r.room_id = t.room_id
-     WHERE t.approval_status = 'Approved'
-       AND t.tenant_id NOT IN (SELECT tenant_id FROM dismissed_records WHERE page = 'status')
+   $whereSql
      ORDER BY FIELD(t.status,'Active','Pending','Evicted','Checked Out'), u.first_name",
-    "SELECT COUNT(*) c FROM tenants t WHERE t.approval_status = 'Approved'
-       AND t.tenant_id NOT IN (SELECT tenant_id FROM dismissed_records WHERE page = 'status')"
+  "SELECT COUNT(*) c FROM tenants t
+   JOIN users u ON u.user_id = t.user_id
+   LEFT JOIN dorm_rooms r ON r.room_id = t.room_id
+   $whereSql",
+  $params,
+  10
 );
 $allTenants = $result['rows'];
 
@@ -41,6 +69,7 @@ render_module_tabs([
   ['key' => 'registration', 'label' => 'Registration & Approval', 'href' => '/admin/tenants.php'],
   ['key' => 'status', 'label' => 'Track Status', 'href' => '/admin/tenant-status.php'],
   ['key' => 'checkin', 'label' => 'Check-in / Check-out', 'href' => '/admin/checkinout.php'],
+  ['key' => 'reservations', 'label' => 'Reservations', 'href' => '/admin/reservations.php'],
 ], 'status'); ?>
 
 <div class="stat-grid stat-grid-4">
@@ -53,22 +82,26 @@ render_module_tabs([
 <div class="panel mt-2">
   <div class="panel-header">
     <h2>All Tenants</h2>
-    <?php if ($allTenants): ?>
-    <div class="dropdown">
-      <button class="btn btn-sm btn-action-outline dropdown-toggle" type="button" data-bs-toggle="dropdown"><i class="bi bi-eraser-fill"></i> Clear</button>
-      <ul class="dropdown-menu dropdown-menu-end">
-        <li><h6 class="dropdown-header">Clear from this view only</h6></li>
-        <?php foreach (['Active', 'Pending', 'Checked Out', 'Evicted'] as $s): $label = $statusLabels[$s] ?? $s; ?>
-          <li><form method="post" onsubmit="return confirm('Clear <?= clean($label) ?> tenants from this view? They stay in the database for reports.');"><?= csrf_field() ?><input type="hidden" name="action" value="clear_view"><input type="hidden" name="page" value="status"><input type="hidden" name="filter" value="<?= clean($s) ?>"><button class="dropdown-item" type="submit">Clear <?= clean($label) ?> only</button></form></li>
-        <?php endforeach; ?>
-        <li><hr class="dropdown-divider"></li>
-        <li><form method="post" onsubmit="return confirm('Clear ALL tenants from this view? They stay in the database for reports.');"><?= csrf_field() ?><input type="hidden" name="action" value="clear_view"><input type="hidden" name="page" value="status"><input type="hidden" name="filter" value="all"><button class="dropdown-item" type="submit">Clear all</button></form></li>
-      </ul>
+  </div>
+  <div class="filter-toolbar">
+    <form class="search-box" method="get">
+      <i class="bi bi-search"></i>
+      <?php if ($statusFilter !== 'all'): ?><input type="hidden" name="status" value="<?= clean($statusFilter) ?>"><?php endif; ?>
+      <input type="search" name="q" value="<?= clean($search) ?>" placeholder="Search tenant, email, room…" class="form-control form-control-sm">
+    </form>
+    <div class="filter-pills">
+      <?php foreach ($statusOptions as $key):
+          $label = $key === 'all' ? 'All' : ($statusLabels[$key] ?? $key);
+          $count = $key === 'all' ? array_sum($counts) : ($counts[$key] ?? 0);
+          $query = http_build_query(array_filter(['status' => $key === 'all' ? null : $key, 'q' => $search ?: null]));
+      ?>
+        <a href="?<?= clean($query) ?>" class="filter-pill <?= $statusFilter === $key ? 'active' : '' ?>"><?= clean($label) ?> <span class="pill-count"><?= $count ?></span></a>
+      <?php endforeach; ?>
     </div>
-    <?php endif; ?>
+    <span class="filter-result-count"><?= $result['total'] ?> result<?= $result['total'] === 1 ? '' : 's' ?></span>
   </div>
   <div class="table-responsive">
-    <table class="table app-table align-middle">
+    <table class="table app-table tenant-management-table align-middle">
       <thead><tr><th>Tenant</th><th>Room</th><th>Status</th><th>Contract Period</th><th>Details</th><th class="text-end">Actions</th></tr></thead>
       <tbody>
       <?php if (!$allTenants): ?><tr><td colspan="6" class="text-center text-muted py-4">No approved tenants yet.</td></tr><?php endif; ?>
@@ -88,7 +121,7 @@ render_module_tabs([
         <tr>
           <td>
             <div class="cell-person">
-              <div class="user-avatar-md" style="color:var(--maroon);background:var(--maroon-soft);"><?= clean(strtoupper(substr($t['first_name'], 0, 1))) ?></div>
+              <div class="applicant-avatar"><i class="bi bi-person-fill" aria-hidden="true"></i></div>
               <div><?= clean($t['first_name'] . ' ' . $t['last_name']) ?></div>
             </div>
           </td>

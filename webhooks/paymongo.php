@@ -47,13 +47,21 @@ if ($type === 'checkout_session.payment.paid') {
         // Guard with payment_status != 'Paid' so a duplicate/retried
         // webhook delivery (PayMongo may send the same event more
         // than once) can't double-process a payment.
-        $db->prepare("UPDATE payments
+        $updated = $db->prepare("UPDATE payments
                 SET payment_status = 'Paid',
                     payment_date = CURDATE(),
+                    paid_at = NOW(),
                     paymongo_payment_id = ?,
                     webhook_received_at = NOW()
-                WHERE paymongo_checkout_id = ? AND payment_status != 'Paid'")
-           ->execute([$paymongoPaymentId, $checkoutId]);
+                WHERE paymongo_checkout_id = ? AND payment_status != 'Paid'");
+        $updated->execute([$paymongoPaymentId, $checkoutId]);
+        if ($updated->rowCount() > 0) {
+            $payment = $db->prepare('SELECT payment_id FROM payments WHERE paymongo_checkout_id = ?');
+            $payment->execute([$checkoutId]);
+            $paymentId = (int) $payment->fetchColumn();
+            log_action('payment_confirmed', 'PayMongo confirmed payment #' . $paymentId);
+            send_payment_invoice($db, $paymentId);
+        }
     }
 } elseif ($type === 'checkout_session.payment.failed') {
     $session    = $event['data']['data'] ?? [];

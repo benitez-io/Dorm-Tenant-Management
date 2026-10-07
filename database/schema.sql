@@ -103,6 +103,24 @@ CREATE TABLE dismissed_records (
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------
+-- ROOM_RESERVATIONS — applicant requests to hold a room before tenant registration.
+-- ---------------------------------------------------------------------
+CREATE TABLE room_reservations (
+  id               INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  applicant_name   VARCHAR(120) NOT NULL,
+  email            VARCHAR(255) NOT NULL,
+  phone            VARCHAR(20) NOT NULL,
+  room_id          INT UNSIGNED NOT NULL,
+  reservation_date DATE NOT NULL,
+  status           ENUM('Pending','Confirmed','Cancelled','Converted') NOT NULL DEFAULT 'Pending',
+  created_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_reservation_room FOREIGN KEY (room_id) REFERENCES dorm_rooms(room_id),
+  INDEX idx_reservation_status (status),
+  INDEX idx_reservation_room_status (room_id, status),
+  INDEX idx_reservation_email (email)
+) ENGINE=InnoDB;
+
+-- ---------------------------------------------------------------------
 -- 4. CONTRACTS — one row per lease term.
 --    Split out from "payments" (see note below) because one contract
 --    covers MANY monthly payments — the prototype's own "Payment
@@ -144,6 +162,7 @@ CREATE TABLE payments (
   payment_amount    DECIMAL(10,2) NOT NULL,
   payment_for_month VARCHAR(20)  DEFAULT NULL,  -- e.g. "June 2026"
   payment_date      DATE DEFAULT NULL,
+  paid_at           DATETIME DEFAULT NULL,
   due_date          DATE DEFAULT NULL,
   payment_status    ENUM('Pending','Paid','Overdue','Failed') NOT NULL DEFAULT 'Pending',
   payment_method    VARCHAR(50) DEFAULT NULL,     -- Cash / GCash / Bank Transfer ...
@@ -172,6 +191,7 @@ CREATE TABLE maintenance_requests (
   issue_description TEXT,
   priority_level    ENUM('Low','Medium','High','Urgent') NOT NULL DEFAULT 'Medium',
   status            ENUM('Pending','Ongoing','Completed') NOT NULL DEFAULT 'Pending',
+  is_resolved       BOOLEAN NOT NULL DEFAULT FALSE,
   assigned_to       VARCHAR(100) DEFAULT NULL,   -- e.g. "Plumber Team"
   photo_file        VARCHAR(255) DEFAULT NULL,
   date_submitted    TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -197,10 +217,60 @@ CREATE TABLE notifications (
   message          TEXT NOT NULL,
   target_type      ENUM('all','room','tenant') NOT NULL DEFAULT 'all',
   target_value     VARCHAR(100) DEFAULT NULL,   -- room_number OR tenant_id, depending on target_type
+  source_key       VARCHAR(120) DEFAULT NULL,
   date_sent        TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_notif_sender FOREIGN KEY (sender_id) REFERENCES users(user_id),
   INDEX idx_notif_type (type),
-  INDEX idx_notif_target (target_type, target_value)
+  INDEX idx_notif_target (target_type, target_value),
+  UNIQUE KEY uq_notifications_source_key (source_key)
+) ENGINE=InnoDB;
+
+CREATE TABLE notification_reads (
+  notification_id INT UNSIGNED NOT NULL,
+  user_id         INT UNSIGNED NOT NULL,
+  read_at         TIMESTAMP NULL DEFAULT NULL,
+  seen_at         TIMESTAMP NULL DEFAULT NULL,
+  is_resolved     BOOLEAN NOT NULL DEFAULT FALSE,
+  is_dismissed    BOOLEAN NOT NULL DEFAULT FALSE,
+  PRIMARY KEY (notification_id, user_id),
+  CONSTRAINT fk_notification_read_notification FOREIGN KEY (notification_id) REFERENCES notifications(notification_id) ON DELETE CASCADE,
+  CONSTRAINT fk_notification_read_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+  INDEX idx_notification_reads_user (user_id)
+) ENGINE=InnoDB;
+
+CREATE TABLE maintenance_reads (
+  maintenance_id  INT UNSIGNED NOT NULL,
+  tenant_id       INT UNSIGNED NOT NULL,
+  seen_updated_at TIMESTAMP NOT NULL,
+  PRIMARY KEY (maintenance_id, tenant_id),
+  CONSTRAINT fk_maintenance_read_request FOREIGN KEY (maintenance_id) REFERENCES maintenance_requests(maintenance_id) ON DELETE CASCADE,
+  CONSTRAINT fk_maintenance_read_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+  INDEX idx_maintenance_reads_tenant (tenant_id)
+) ENGINE=InnoDB;
+
+CREATE TABLE audit_logs (
+  audit_id    INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id     INT UNSIGNED DEFAULT NULL,
+  action      VARCHAR(100) NOT NULL,
+  details     TEXT NOT NULL,
+  ip_address  VARCHAR(45) DEFAULT NULL,
+  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_audit_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE SET NULL,
+  INDEX idx_audit_created (created_at),
+  INDEX idx_audit_user (user_id)
+) ENGINE=InnoDB;
+
+CREATE TABLE system_bugs (
+  id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id     INT UNSIGNED DEFAULT NULL,
+  role        ENUM('super_admin','admin','tenant','guest') NOT NULL DEFAULT 'guest',
+  description TEXT NOT NULL,
+  page_url    VARCHAR(500) NOT NULL DEFAULT '',
+  status      ENUM('Pending','In Progress','Resolved') NOT NULL DEFAULT 'Pending',
+  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_system_bugs_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE SET NULL,
+  INDEX idx_system_bugs_status (status),
+  INDEX idx_system_bugs_created (created_at)
 ) ENGINE=InnoDB;
 
 -- ---------------------------------------------------------------------
@@ -261,10 +331,10 @@ INSERT INTO dorm_rooms (room_number, room_type, capacity, monthly_rate, floor_nu
   ('301', '2BR',    4, 8000.00, 3, 'Available', 'Corner unit');
 
 INSERT INTO tenants (user_id, room_id, checkin_date, status, approval_status, emergency_contact, emergency_phone)
-VALUES (2, 2, '2025-08-15', 'Active', 'Approved', 'Maria Ayado', '+63 918 987 6543');
+VALUES (2, 2, '2025-08-15', 'Active', 'Approved', 'Vilma Ayado', '+63 918 987 6543');
 
 INSERT INTO contracts (tenant_id, room_id, monthly_rent, security_deposit, contract_start, contract_end, contract_status)
-VALUES (1, 2, 5500.00, 5500.00, '2025-08-15', '2026-05-15', 'Active');
+VALUES (1, 2, 5500.00, 5500.00, '2025-08-15', '2026-12-15', 'Active');
 
 INSERT INTO payments (contract_id, tenant_id, payment_amount, payment_for_month, payment_date, due_date, payment_status, payment_method)
 VALUES
@@ -282,3 +352,140 @@ VALUES
   ('tenant_registered', 'Angel Benitez registered as a new tenant', 1),
   ('contract_created', 'Contract created for Angel Benitez (Room 102)', 1),
   ('payment_recorded', 'Payment of PHP 5,500.00 recorded for Angel Benitez (February 2026)', 1);
+
+-- migration_add_audit_and_sticky_notifications.sql
+USE dorm_tenant_system;
+
+ALTER TABLE notifications
+  ADD COLUMN IF NOT EXISTS source_key VARCHAR(120) DEFAULT NULL AFTER target_value,
+  ADD UNIQUE KEY IF NOT EXISTS uq_notifications_source_key (source_key);
+
+CREATE TABLE IF NOT EXISTS notification_reads (
+  notification_id INT UNSIGNED NOT NULL,
+  user_id         INT UNSIGNED NOT NULL,
+  read_at         TIMESTAMP NULL DEFAULT NULL,
+  seen_at         TIMESTAMP NULL DEFAULT NULL,
+  is_resolved     BOOLEAN NOT NULL DEFAULT FALSE,
+  is_dismissed    BOOLEAN NOT NULL DEFAULT FALSE,
+  PRIMARY KEY (notification_id, user_id),
+  CONSTRAINT fk_notification_read_notification FOREIGN KEY (notification_id) REFERENCES notifications(notification_id) ON DELETE CASCADE,
+  CONSTRAINT fk_notification_read_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+  INDEX idx_notification_reads_user (user_id)
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+  audit_id    INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id     INT UNSIGNED DEFAULT NULL,
+  action      VARCHAR(100) NOT NULL,
+  details     TEXT NOT NULL,
+  ip_address  VARCHAR(45) DEFAULT NULL,
+  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_audit_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE SET NULL,
+  INDEX idx_audit_created (created_at),
+  INDEX idx_audit_user (user_id)
+) ENGINE=InnoDB;
+
+ALTER TABLE notification_reads
+  ADD COLUMN IF NOT EXISTS seen_at TIMESTAMP NULL DEFAULT NULL AFTER read_at,
+  ADD COLUMN IF NOT EXISTS is_resolved BOOLEAN NOT NULL DEFAULT FALSE AFTER seen_at,
+  ADD COLUMN IF NOT EXISTS is_dismissed BOOLEAN NOT NULL DEFAULT FALSE AFTER is_resolved;
+
+ALTER TABLE notification_reads
+  MODIFY COLUMN read_at TIMESTAMP NULL DEFAULT NULL;
+
+UPDATE notification_reads
+SET seen_at = read_at, is_resolved = TRUE
+WHERE seen_at IS NULL AND is_resolved = FALSE;
+
+UPDATE notification_reads nr
+JOIN notifications n ON n.notification_id = nr.notification_id
+SET nr.is_dismissed = TRUE
+WHERE n.type = 'Announcement' AND nr.is_resolved = TRUE AND nr.is_dismissed = FALSE;
+
+ALTER TABLE maintenance_requests
+  ADD COLUMN IF NOT EXISTS is_resolved BOOLEAN NOT NULL DEFAULT FALSE AFTER status;
+
+UPDATE maintenance_requests SET is_resolved = (status = 'Completed');
+
+CREATE TABLE IF NOT EXISTS maintenance_reads (
+  maintenance_id  INT UNSIGNED NOT NULL,
+  tenant_id       INT UNSIGNED NOT NULL,
+  seen_updated_at TIMESTAMP NOT NULL,
+  PRIMARY KEY (maintenance_id, tenant_id),
+  CONSTRAINT fk_maintenance_read_request FOREIGN KEY (maintenance_id) REFERENCES maintenance_requests(maintenance_id) ON DELETE CASCADE,
+  CONSTRAINT fk_maintenance_read_tenant FOREIGN KEY (tenant_id) REFERENCES tenants(tenant_id) ON DELETE CASCADE,
+  INDEX idx_maintenance_reads_tenant (tenant_id)
+) ENGINE=InnoDB;
+
+INSERT IGNORE INTO maintenance_reads (maintenance_id, tenant_id, seen_updated_at)
+SELECT maintenance_id, tenant_id, updated_at FROM maintenance_requests WHERE updated_at IS NOT NULL;
+
+-- Initial Super Admin account. Change this password after the first login.
+INSERT INTO users (first_name, last_name, email, password_hash, role, is_active)
+SELECT 'System', 'Super Admin', 'superadmin@dorm.edu',
+       '$2y$10$ZDDTT7ptNMjCbtTxfH9kmudDl83EGgBETbTqHDsfIeYPn7Jm3DDJ6',
+       'super_admin', 1
+WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'superadmin@dorm.edu');
+
+USE dorm_tenant_system;
+
+ALTER TABLE users
+  MODIFY COLUMN role ENUM('super_admin','admin','tenant') NOT NULL DEFAULT 'tenant';
+
+INSERT INTO users (first_name, last_name, email, password_hash, role, is_active)
+SELECT 'System', 'Super Admin', 'superadmin@dorm.edu',
+       '$2y$10$ZDDTT7ptNMjCbtTxfH9kmudDl83EGgBETbTqHDsfIeYPn7Jm3DDJ6',
+       'super_admin', 1
+WHERE NOT EXISTS (SELECT 1 FROM users WHERE email = 'superadmin@dorm.edu');
+
+
+-- Add bug reports without changing existing application data.
+USE dorm_tenant_system;
+
+CREATE TABLE IF NOT EXISTS system_bugs (
+  id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id     INT UNSIGNED DEFAULT NULL,
+  role        ENUM('super_admin','admin','tenant','guest') NOT NULL DEFAULT 'guest',
+  description TEXT NOT NULL,
+  page_url    VARCHAR(500) NOT NULL DEFAULT '',
+  status      ENUM('Pending','In Progress','Resolved') NOT NULL DEFAULT 'Pending',
+  created_at  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_system_bugs_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE SET NULL,
+  INDEX idx_system_bugs_status (status),
+  INDEX idx_system_bugs_created (created_at)
+) ENGINE=InnoDB;
+
+ALTER TABLE system_bugs
+  DROP FOREIGN KEY fk_system_bugs_user,
+  MODIFY COLUMN user_id INT UNSIGNED DEFAULT NULL,
+  MODIFY COLUMN role ENUM('super_admin','admin','tenant','guest') NOT NULL DEFAULT 'guest',
+  ADD CONSTRAINT fk_system_bugs_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE SET NULL;
+
+
+  -- Store the successful payment confirmation time for invoice receipts.
+USE dorm_tenant_system;
+
+ALTER TABLE payments
+  ADD COLUMN IF NOT EXISTS paid_at DATETIME DEFAULT NULL AFTER payment_date;
+
+UPDATE payments
+SET paid_at = TIMESTAMP(payment_date, '00:00:00')
+WHERE payment_status = 'Paid' AND payment_date IS NOT NULL AND paid_at IS NULL;
+
+//Reserve a room for applicants before they register as tenants. This table is linked to dorm_rooms and allows tracking of reservation status.
+USE dorm_tenant_system;
+
+CREATE TABLE IF NOT EXISTS room_reservations (
+  id               INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  applicant_name   VARCHAR(120) NOT NULL,
+  email            VARCHAR(255) NOT NULL,
+  phone            VARCHAR(20) NOT NULL,
+  room_id          INT UNSIGNED NOT NULL,
+  reservation_date DATE NOT NULL,
+  status           ENUM('Pending','Confirmed','Cancelled','Converted') NOT NULL DEFAULT 'Pending',
+  created_at       TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_reservation_room FOREIGN KEY (room_id) REFERENCES dorm_rooms(room_id),
+  INDEX idx_reservation_status (status),
+  INDEX idx_reservation_room_status (room_id, status),
+  INDEX idx_reservation_email (email)
+) ENGINE=InnoDB;

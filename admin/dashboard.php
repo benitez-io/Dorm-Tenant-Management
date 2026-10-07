@@ -86,7 +86,34 @@ $roomTypeBreakdown = $db->query("
     FROM dorm_rooms GROUP BY room_type ORDER BY room_type
 ")->fetchAll();
 
-$recentActivity = $db->query("SELECT activity_id, activity_type, description, related_tenant_id, created_at FROM activity_log ORDER BY created_at DESC LIMIT 6")->fetchAll();
+$allRecentActivity = $db->query("
+  SELECT activity_type, description, created_at, performed_by, ip_address, source, event_id
+  FROM (
+    SELECT a.action AS activity_type, a.details AS description, a.created_at,
+         COALESCE(NULLIF(TRIM(CONCAT_WS(' ', u.first_name, u.last_name)), ''), 'System') AS performed_by,
+               COALESCE(a.ip_address, '-') AS ip_address, 'Audit Trail' AS source, a.audit_id AS event_id
+    FROM audit_logs a
+    LEFT JOIN users u ON u.user_id = a.user_id
+
+    UNION ALL
+
+     SELECT l.activity_type, l.description, l.created_at, 'Activity Feed' AS performed_by,
+       '-' AS ip_address, 'Activity Log' AS source, l.activity_id AS event_id
+    FROM activity_log l
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM audit_logs a
+      WHERE a.created_at BETWEEN DATE_SUB(l.created_at, INTERVAL 10 SECOND) AND DATE_ADD(l.created_at, INTERVAL 10 SECOND)
+        AND (
+          (a.action = l.activity_type AND a.details = l.description)
+          OR (l.activity_type = 'payment_verified' AND a.action = 'payment_status_changed')
+          OR (l.activity_type = 'payment_recorded' AND a.action = 'payment_recorded')
+        )
+    )
+  ) AS recent_activity
+  ORDER BY created_at DESC, event_id DESC
+")->fetchAll();
+$recentActivity = array_slice($allRecentActivity, 0, 6);
 
 // =====================================================================
 // TENANTS TAB DATA
@@ -184,6 +211,7 @@ $categoryTotalCount = max(1, array_sum($categoryTotals));
 
 $pageTitle = 'Admin Dashboard';
 include __DIR__ . '/../includes/header.php';
+require_once __DIR__ . '/../includes/page_header.php';
 
 /**
  * Dynamic Bootstrap Icon helper for Dashboard Recent Activity & Audit Logs
@@ -241,15 +269,12 @@ function getSystemActivityIcon(string $activityType): array {
     }
 }
 ?>
-<div class="page-header">
-  <div>
-    <h1>Admin Dashboard</h1>
-    <p class="dashboard-date"><i class="bi bi-calendar3"></i> <?= date('l, F j, Y') ?></p>
-  </div>
-  <div class="dashboard-actions">
-    <button type="button" class="btn-icon" aria-label="Refresh dashboard" onclick="window.location.reload();"><i class="bi bi-arrow-clockwise"></i></button>
-  </div>
-</div>
+<?php render_page_header(
+    'bi-grid-1x2-fill',
+    'Admin Dashboard',
+    date('l, F j, Y'),
+    '<button type="button" class="btn-icon" aria-label="Refresh dashboard" onclick="window.location.reload();"><i class="bi bi-arrow-clockwise"></i></button>'
+); ?>
 
 <div class="stat-grid dashboard-kpis">
   <div class="stat-card h-100">
@@ -347,7 +372,7 @@ function getSystemActivityIcon(string $activityType): array {
         </div>
       </div>
       <div class="panel mt-3">
-        <div class="panel-header"><h2>Recent Activity</h2><a href="<?= BASE_URL ?>/admin/reports.php" class="group inline-nav-link dashboard-card-footer-link">View all <i class="bi bi-arrow-up-right link-arrow-icon"></i></a></div>
+        <div class="panel-header"><h2>Recent Activity</h2><a href="#recentActivityModal" class="group inline-nav-link dashboard-card-footer-link" data-bs-toggle="modal" data-bs-target="#recentActivityModal" aria-controls="recentActivityModal">View all <i class="bi bi-arrow-up-right link-arrow-icon"></i></a></div>
         <?php if (!$recentActivity): ?><p class="text-muted mb-0">Activity will appear here as the system is used.</p><?php endif; ?>
         <div class="recent-activity-feed d-flex flex-column gap-2">
           <?php foreach ($recentActivity as $a): ?>
@@ -402,7 +427,7 @@ function getSystemActivityIcon(string $activityType): array {
           <?php foreach ($recentActiveTenants as $t): ?>
             <div class="tenant-row panel-list-item">
               <div class="cell-person">
-                <div class="user-avatar-md" style="color:var(--maroon);background:var(--maroon-soft);"><?= clean(strtoupper(substr($t['first_name'], 0, 1))) ?></div>
+                <div class="applicant-avatar"><i class="bi bi-person-fill" aria-hidden="true"></i></div>
                 <div><?= clean($t['first_name'] . ' ' . $t['last_name']) ?><div class="sub"><?= $t['room_number'] ? 'Room ' . clean($t['room_number']) : 'Unassigned' ?> · <?= clean($t['tenant_type']) ?></div></div>
               </div>
               <span class="badge badge-<?= status_badge_class($t['last_payment_status']) ?>">● <?= clean($t['last_payment_status']) ?></span>
@@ -460,7 +485,7 @@ function getSystemActivityIcon(string $activityType): array {
           <?php foreach ($recentPayments as $p): ?>
             <div class="tenant-row panel-list-item">
               <div class="cell-person">
-                <div class="user-avatar-md" style="color:var(--maroon);background:var(--maroon-soft);"><?= clean(strtoupper(substr($p['first_name'], 0, 1))) ?></div>
+                <div class="applicant-avatar"><i class="bi bi-person-fill" aria-hidden="true"></i></div>
                 <div><?= clean($p['first_name'] . ' ' . $p['last_name']) ?><div class="sub"><?= $p['room_number'] ? 'Room ' . clean($p['room_number']) : '—' ?> · <?= clean($p['payment_method'] ?: '—') ?> · <?= $p['payment_date'] ? clean(date('M j, Y', strtotime($p['payment_date']))) : '—' ?></div></div>
               </div>
               <strong class="text-success"><?= peso($p['payment_amount']) ?></strong>
@@ -541,6 +566,40 @@ function getSystemActivityIcon(string $activityType): array {
     </div>
   </div>
 </section>
+
+<div class="modal fade recent-activity-modal" id="recentActivityModal" tabindex="-1" aria-labelledby="recentActivityModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div>
+          <h2 class="modal-title fs-5" id="recentActivityModalLabel">Recent Activity</h2>
+          <p class="recent-activity-modal-subtitle">System events from the audit trail and activity feed.</p>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0 recent-activity-table">
+            <thead class="table-light"><tr><th>Date &amp; Time</th><th>Activity</th><th>Description</th><th>Recorded By</th><th>Source</th></tr></thead>
+            <tbody>
+              <?php if (!$allRecentActivity): ?><tr><td colspan="5" class="text-center text-muted py-5">No activity has been recorded yet.</td></tr><?php endif; ?>
+              <?php foreach ($allRecentActivity as $activity): ?>
+                <tr>
+                  <td class="text-nowrap"><?= clean(date('M j, Y g:i A', strtotime($activity['created_at']))) ?></td>
+                  <td class="text-nowrap"><?= clean(str_replace('_', ' ', $activity['activity_type'])) ?></td>
+                  <td><?= clean($activity['description']) ?></td>
+                  <td class="text-nowrap"><?= clean($activity['performed_by']) ?></td>
+                  <td><span class="badge badge-secondary"><?= clean($activity['source']) ?></span></td>
+                </tr>
+              <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer"><button type="button" class="btn btn-action-outline" data-bs-dismiss="modal">Close</button></div>
+    </div>
+  </div>
+</div>
 
 <?php
 $chartLabelsJson = json_encode($chartLabels);

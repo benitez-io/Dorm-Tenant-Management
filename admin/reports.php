@@ -5,6 +5,7 @@ require_role('admin');
 $pageTitle = 'Reports & Analytics';
 include __DIR__ . '/../includes/header.php';
 require_once __DIR__ . '/../includes/module_tabs.php';
+require_once __DIR__ . '/../includes/page_header.php';
 
 $categories = [
     'occupancy'   => ['title' => 'Occupancy Reports',   'reports' => [
@@ -21,7 +22,7 @@ $categories = [
     ]],
 ];
 ?>
-<div class="page-header"><div><h1>Reports &amp; Analytics</h1><p class="text-muted">Generate and export comprehensive reports for property management.</p></div></div>
+<?php render_page_header('bi-bar-chart-line-fill', 'Reports & Analytics', 'Generate and export comprehensive reports for property management.'); ?>
 <?php render_module_tabs([
   ['key' => 'all', 'label' => 'All Reports', 'href' => '/admin/reports.php#all-reports', 'target' => 'all-reports'],
   ['key' => 'occupancy', 'label' => 'Occupancy', 'href' => '/admin/reports.php#occupancy', 'target' => 'occupancy'],

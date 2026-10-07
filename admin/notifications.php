@@ -50,7 +50,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     redirect('/admin/notifications.php');
 }
 
-$recent = $db->query("SELECT * FROM notifications ORDER BY date_sent DESC LIMIT 15")->fetchAll();
+mark_notifications_seen($db, current_user_id());
+
+$recentStatement = $db->prepare("SELECT n.*, nr.seen_at, COALESCE(nr.is_resolved, 0) AS is_resolved,
+    COALESCE(nr.is_dismissed, 0) AS is_dismissed
+  FROM notifications n
+  LEFT JOIN notification_reads nr ON nr.notification_id = n.notification_id AND nr.user_id = ?
+  WHERE (n.type = 'Announcement' AND COALESCE(nr.is_dismissed, 0) = 0)
+     OR (n.type <> 'Announcement' AND COALESCE(nr.is_resolved, 0) = 0)
+     OR n.notification_id IN (
+    SELECT recent.notification_id
+    FROM (SELECT notification_id FROM notifications ORDER BY date_sent DESC LIMIT 15) recent
+  )
+  ORDER BY n.date_sent DESC");
+$recentStatement->execute([current_user_id()]);
+$recent = $recentStatement->fetchAll();
 $tenantsForSelect = $db->query("SELECT t.tenant_id, u.first_name, u.last_name, u.phone FROM tenants t JOIN users u ON u.user_id=t.user_id WHERE t.status='Active' ORDER BY u.first_name")->fetchAll();
 
 $typeIcon = ['Announcement' => '<i class="bi bi-bell-fill"></i>', 'Payment Reminder' => '<i class="bi bi-wallet2"></i>', 'Contract Expiry Alert' => '<i class="bi bi-calendar2-warning"></i>'];
@@ -64,8 +78,9 @@ $typeOptions = [
 $pageTitle = 'Notification Management';
 include __DIR__ . '/../includes/header.php';
 require_once __DIR__ . '/../includes/module_tabs.php';
+require_once __DIR__ . '/../includes/page_header.php';
 ?>
-<div class="page-header"><div><h1>Notification Management</h1><p class="text-muted">Send announcements, payment reminders, and expiry alerts to tenants.</p></div></div>
+<?php render_page_header('bi-bell-fill', 'Notification Management', 'Send announcements, payment reminders, and expiry alerts to tenants.'); ?>
 <?php render_module_tabs([
   ['key' => 'announcements', 'label' => 'Announcements', 'href' => '/admin/notifications.php#notification-announcements', 'target' => 'notification-announcements', 'selectValue' => 'Announcement'],
   ['key' => 'payments', 'label' => 'Payment Reminders', 'href' => '/admin/notifications.php#notification-payments', 'target' => 'notification-payments', 'selectValue' => 'Payment Reminder'],
@@ -129,7 +144,7 @@ require_once __DIR__ . '/../includes/module_tabs.php';
   <div class="panel-header"><h2>Recent Notifications</h2></div>
   <?php if (!$recent): ?><p class="text-muted py-3">No notifications sent yet.</p><?php endif; ?>
   <?php foreach ($recent as $n): ?>
-    <div class="notification-item <?= $typeTint[$n['type']] ?? '' ?>">
+    <div class="notification-item <?= $typeTint[$n['type']] ?? '' ?> <?= $n['seen_at'] ? 'notification-seen' : 'notification-unseen' ?>">
       <div class="notification-icon"><?= $typeIcon[$n['type']] ?? '<i class="bi bi-bell-fill"></i>' ?></div>
       <div class="flex-grow-1">
         <strong><?= clean($n['subject']) ?></strong>
@@ -138,6 +153,7 @@ require_once __DIR__ . '/../includes/module_tabs.php';
           <?= clean($n['target_type'] === 'all' ? 'All Tenants' : ($n['target_type'] === 'room' ? 'Room(s): ' . $n['target_value'] : 'Specific tenant')) ?>
           · <?= clean(date('M j, Y', strtotime($n['date_sent']))) ?>
         </div>
+        <?php if ($n['seen_at']): ?><div class="text-muted small mt-1">Seen: <?= clean(date('M j, Y g:i A', strtotime($n['seen_at']))) ?></div><?php endif; ?>
       </div>
     </div>
   <?php endforeach; ?>

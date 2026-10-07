@@ -51,6 +51,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $db->prepare('UPDATE users SET first_name=?, last_name=?, email=?, role=? WHERE user_id=?')
                        ->execute([$first, $last, $email, $role, $id]);
                 }
+                if ($targetRole !== $role) {
+                  log_action('user_role_modified', 'Changed role for user #' . $id . ' from ' . $targetRole . ' to ' . $role);
+                }
                 flash('success', 'Account updated.');
             }
         }
@@ -79,6 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             try {
                 $db->beginTransaction();
+              log_action('user_deleted', 'Deleted user #' . $id . ' with role ' . $getTargetRole($id));
                 $db->prepare('DELETE FROM notifications WHERE sender_id = ?')->execute([$id]);
                 $db->prepare('DELETE FROM reports WHERE generated_by = ?')->execute([$id]);
                 $db->prepare('DELETE FROM users WHERE user_id = ?')->execute([$id]);
@@ -138,7 +142,7 @@ render_module_tabs([
           <tr>
             <td>
               <div class="cell-person">
-                <div class="user-avatar-md" style="color:var(--maroon);background:var(--maroon-soft);"><?= clean(strtoupper(substr($u['first_name'], 0, 1))) ?></div>
+                <div class="applicant-avatar"><i class="bi bi-person-fill" aria-hidden="true"></i></div>
                 <div><?= clean($u['first_name'] . ' ' . $u['last_name']) ?><div class="sub"><?= clean($u['email']) ?></div></div>
               </div>
             </td>

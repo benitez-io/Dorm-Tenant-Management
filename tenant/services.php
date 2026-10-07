@@ -65,8 +65,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $pageTitle = 'My Room & Contract';
 include __DIR__ . '/../includes/header.php';
+require_once __DIR__ . '/../includes/page_header.php';
 ?>
-<div class="page-header"><div><h1>My Room &amp; Contract</h1></div></div>
+<?php render_page_header('bi-door-open-fill', 'My Room & Contract', 'View your room details and contract terms.', null, 'Tenant Portal', '/tenant/dashboard.php'); ?>
 
 <?php if (!$room): ?>
   <div class="alert alert-info">No room has been assigned to you yet.</div>
@@ -74,18 +75,18 @@ include __DIR__ . '/../includes/header.php';
 <div class="row g-4">
   <div class="col-md-5">
     <div class="room-detail-card">
-      <div class="d-flex justify-content-between align-items-start">
-        <div>
-          <h2 class="mb-0">Room <?= clean($room['room_number']) ?></h2>
-          <div class="opacity-75"><?= clean($room['room_type']) ?> · Floor <?= (int) $room['floor_number'] ?></div>
+      <div class="room-detail-header">
+        <div class="room-detail-heading">
+          <h2 class="text-white">Room <?= clean($room['room_number']) ?></h2>
+          <div class="room-detail-type text-white"><?= clean($room['room_type']) ?> · Floor <?= (int) $room['floor_number'] ?></div>
         </div>
-        <span class="room-icon"><i class="bi bi-house-door-fill"></i></span>
+        <span class="room-icon text-white" aria-hidden="true"><i class="bi bi-house-door-fill"></i></span>
       </div>
-      <div class="row mt-4 g-3">
-        <div class="col-6"><div class="opacity-75 small">Capacity</div><strong><?= (int) $room['capacity'] ?> tenant(s)</strong></div>
-        <div class="col-6"><div class="opacity-75 small">Monthly Rate</div><strong><?= peso($room['monthly_rate']) ?></strong></div>
-        <div class="col-6"><div class="opacity-75 small">Move-in</div><strong><?= $tenant['checkin_date'] ? clean(date('M j, Y', strtotime($tenant['checkin_date']))) : 'Not checked in yet' ?></strong></div>
-        <div class="col-6"><div class="opacity-75 small">Status</div><strong><?= clean($tenant['status']) ?></strong></div>
+      <div class="room-detail-stats">
+        <div class="room-detail-stat"><span class="room-detail-label text-white">Capacity</span><strong class="text-white"><?= (int) $room['capacity'] ?> tenant(s)</strong></div>
+        <div class="room-detail-stat"><span class="room-detail-label text-white">Monthly Rate</span><strong class="text-white"><?= peso($room['monthly_rate']) ?></strong></div>
+        <div class="room-detail-stat"><span class="room-detail-label text-white">Move-in</span><strong class="text-white"><?= $tenant['checkin_date'] ? clean(date('M j, Y', strtotime($tenant['checkin_date']))) : 'Not checked in yet' ?></strong></div>
+        <div class="room-detail-stat"><span class="room-detail-label text-white">Status</span><strong class="text-white"><?= clean($tenant['status']) ?></strong></div>
       </div>
     </div>
   </div>

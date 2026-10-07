@@ -53,8 +53,9 @@ $contactName = preg_replace('/\s*\([^)]*\)$/', '', (string) ($profile['emergency
 
 $pageTitle = 'My Profile';
 include __DIR__ . '/../includes/header.php';
+require_once __DIR__ . '/../includes/page_header.php';
 ?>
-<div class="page-header"><div><h1>My Profile</h1></div></div>
+<?php render_page_header('bi-person-circle', 'My Profile', 'Manage your personal information and contact details.', null, 'Tenant Portal', '/tenant/dashboard.php'); ?>
 
 <div class="container-lg">
   <div class="row justify-content-center">

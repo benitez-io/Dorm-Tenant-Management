@@ -141,6 +141,35 @@ function csrf_verify(): void
     }
 }
 
+function log_action(string $action, string $details): void
+{
+    $userId = (int) ($_SESSION['user_id'] ?? 0);
+    $statement = get_db()->prepare('INSERT INTO audit_logs (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)');
+    $statement->execute([$userId > 0 ? $userId : null, $action, $details, $_SERVER['REMOTE_ADDR'] ?? null]);
+}
+
+function mark_notifications_seen(PDO $db, int $userId, ?int $tenantId = null, ?string $roomNumber = null): void
+{
+    $query = 'INSERT INTO notification_reads (notification_id, user_id, seen_at) SELECT n.notification_id, ?, NOW() FROM notifications n';
+    $parameters = [$userId];
+    if ($tenantId !== null) {
+        $query .= " WHERE n.target_type = 'all' OR (n.target_type = 'tenant' AND n.target_value = ?) OR (n.target_type = 'room' AND FIND_IN_SET(?, REPLACE(n.target_value, ' ', '')))";
+        $parameters[] = (string) $tenantId;
+        $parameters[] = $roomNumber ?? '__none__';
+    }
+    $query .= ' ON DUPLICATE KEY UPDATE seen_at = COALESCE(notification_reads.seen_at, VALUES(seen_at))';
+    $db->prepare($query)->execute($parameters);
+}
+
+function mark_tenant_maintenance_updates_seen(PDO $db, int $tenantId): void
+{
+    $statement = $db->prepare('INSERT INTO maintenance_reads (maintenance_id, tenant_id, seen_updated_at)
+        SELECT maintenance_id, tenant_id, updated_at FROM maintenance_requests
+        WHERE tenant_id = ? AND updated_at IS NOT NULL
+        ON DUPLICATE KEY UPDATE seen_updated_at = GREATEST(maintenance_reads.seen_updated_at, VALUES(seen_updated_at))');
+    $statement->execute([$tenantId]);
+}
+
 /** Highlights the active sidebar link. */
 function active(string $path): string
 {
@@ -655,13 +684,19 @@ function settle_pending_gcash_payment(PDO $db, array $payment, bool $discardAban
         // Same "don't double-process" guard the webhook uses, so
         // whichever path gets there first wins and the other is a
         // no-op instead of a second confirmation.
-        $db->prepare("
+        $updated = $db->prepare("
             UPDATE payments
                SET payment_status = 'Paid',
                    payment_date = CURDATE(),
+                   paid_at = NOW(),
                    paymongo_payment_id = COALESCE(paymongo_payment_id, ?)
              WHERE payment_id = ? AND payment_status != 'Paid'
-        ")->execute([$result['payment_id'], $payment['payment_id']]);
+        ");
+        $updated->execute([$result['payment_id'], $payment['payment_id']]);
+        if ($updated->rowCount() > 0) {
+            log_action('payment_confirmed', 'Payment #' . $payment['payment_id'] . ' confirmed by PayMongo status check');
+            send_payment_invoice($db, (int) $payment['payment_id']);
+        }
 
         $payment['payment_status'] = 'Paid';
         return $payment;
@@ -749,5 +784,15 @@ function log_activity(PDO $db, string $type, string $description, ?int $tenantId
            ->execute([$type, $description, $tenantId]);
     } catch (PDOException $e) {
         error_log('log_activity failed: ' . $e->getMessage());
+    }
+
+    if (in_array($type, ['payment_recorded', 'payment_verified'], true)) {
+        return;
+    }
+
+    try {
+        log_action($type, $description);
+    } catch (PDOException $e) {
+        error_log('log_activity audit entry failed: ' . $e->getMessage());
     }
 }

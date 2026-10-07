@@ -9,16 +9,19 @@ if (!$tenant || $tenant['approval_status'] !== 'Approved') {
     redirect('/tenant/dashboard.php');
 }
 
-$requests = $db->prepare('SELECT * FROM maintenance_requests WHERE tenant_id = ? ORDER BY date_submitted DESC');
-$requests->execute([$tenant['tenant_id']]);
+mark_tenant_maintenance_updates_seen($db, (int) $tenant['tenant_id']);
+
+$requests = $db->prepare('SELECT * FROM maintenance_requests WHERE tenant_id = ? ORDER BY COALESCE(updated_at, date_submitted) DESC, date_submitted DESC');
+$requests->execute([(int) $tenant['tenant_id']]);
 $requests = $requests->fetchAll();
 
 $issueTypes = ['Plumbing', 'Electrical', 'HVAC / Air Conditioning', 'Heating', 'Furniture', 'Security / Locks', 'Pest Control', 'Other'];
 
 $pageTitle = 'Maintenance Requests';
 include __DIR__ . '/../includes/header.php';
+require_once __DIR__ . '/../includes/page_header.php';
 ?>
-<div class="page-header"><div><h1>Maintenance Requests</h1><p class="text-muted">Submit and track repair requests for your room.</p></div></div>
+<?php render_page_header('bi-wrench-adjustable', 'Maintenance Requests', 'Submit and track repair requests for your room.', null, 'Tenant Portal', '/tenant/dashboard.php'); ?>
 
 <button type="button" class="btn btn-sm btn-action-primary mb-3" data-bs-toggle="collapse" data-bs-target="#newRequestForm">+ New Maintenance Request</button>
 
@@ -94,7 +97,7 @@ include __DIR__ . '/../includes/header.php';
 
 <div class="panel">
   <div class="panel-header"><h2>Request History &amp; Status Tracker</h2></div>
-  <?php if (!$requests): ?><p class="text-muted py-3">No requests yet.</p><?php endif; ?>
+  <?php if (!$requests): ?><p class="text-muted py-3"><?= $statusFilter === 'all' ? 'No requests yet.' : 'No requests in this status.' ?></p><?php endif; ?>
   <?php foreach ($requests as $r):
     $steps = ['Pending' => 1, 'Ongoing' => 2, 'Completed' => 3];
     $progress = $steps[$r['status']] ?? 1;

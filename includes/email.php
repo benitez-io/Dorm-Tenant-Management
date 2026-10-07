@@ -29,7 +29,7 @@ define('SMTP_PASSWORD', 'cbac tote dznp yuzf');  // TODO: set this
  * Sends an HTML email. Returns true if actually sent, false if it was
  * only logged (PHPMailer missing) or failed.
  */
-function send_email_alert(string $toEmail, string $toName, string $subject, string $bodyHtml): bool
+function send_email_alert(string $toEmail, string $toName, string $subject, string $bodyHtml, ?string $attachmentPath = null, ?string $attachmentName = null): bool
 {
     $autoload = __DIR__ . '/../vendor/autoload.php';
 
@@ -52,6 +52,9 @@ function send_email_alert(string $toEmail, string $toName, string $subject, stri
 
         $mail->setFrom(SMTP_USERNAME, defined('SITE_NAME') ? SITE_NAME : 'Dorm Tenant Management System');
         $mail->addAddress($toEmail, $toName);
+        if ($attachmentPath !== null && is_file($attachmentPath)) {
+          $mail->addAttachment($attachmentPath, $attachmentName ?? basename($attachmentPath));
+        }
         $mail->isHTML(true);
         $mail->Subject = $subject;
         $mail->Body    = $bodyHtml;

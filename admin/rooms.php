@@ -41,11 +41,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $tenantId = (int) ($_POST['tenant_id'] ?? 0);
 
         $db->beginTransaction();
-        $room = $db->prepare('SELECT r.*, (SELECT COUNT(*) FROM tenants t WHERE t.room_id = r.room_id AND t.status = "Active") AS occupancy_count FROM dorm_rooms r WHERE r.room_id = ? FOR UPDATE');
+        $room = $db->prepare("SELECT r.*,
+          (SELECT COUNT(*) FROM tenants t WHERE t.room_id = r.room_id AND t.status IN ('Active','Pending')) AS tenant_count,
+          (SELECT COUNT(*) FROM room_reservations rr WHERE rr.room_id = r.room_id AND rr.status IN ('Pending','Confirmed')) AS reservation_count
+          FROM dorm_rooms r WHERE r.room_id = ? FOR UPDATE");
         $room->execute([$roomId]);
         $room = $room->fetch();
 
-        if (!$room || !in_array($room['status'], ['Available', 'Occupied'], true) || (int) $room['occupancy_count'] >= (int) $room['capacity']) {
+        if (!$room || $room['status'] === 'Under Maintenance' || (int) $room['tenant_count'] + (int) $room['reservation_count'] >= (int) $room['capacity']) {
             $db->rollBack();
             flash('error', 'That room is no longer available.');
         } elseif ($tenantId <= 0) {
@@ -54,9 +57,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } else {
             try {
                 $db->prepare('UPDATE tenants SET room_id = ? WHERE tenant_id = ?')->execute([$roomId, $tenantId]);
-                $newOccupancy = (int) $room['occupancy_count'] + 1;
-                $newStatus = $newOccupancy >= (int) $room['capacity'] ? 'Occupied' : 'Available';
-              $db->prepare('UPDATE dorm_rooms SET status = ? WHERE room_id = ?')->execute([$newStatus, $roomId]);
+                $newTenantCount = (int) $room['tenant_count'] + 1;
+                $newAllocationCount = $newTenantCount + (int) $room['reservation_count'];
+                $newStatus = $newTenantCount >= (int) $room['capacity'] ? 'Occupied' : ($newAllocationCount >= (int) $room['capacity'] ? 'Reserved' : 'Available');
+                $db->prepare('UPDATE dorm_rooms SET status = ? WHERE room_id = ?')->execute([$newStatus, $roomId]);
                 $db->commit();
                 flash('success', 'Tenant assigned to Room ' . $room['room_number'] . '.');
             } catch (Exception $e) {
@@ -75,8 +79,10 @@ $occupied    = (int) $db->query("SELECT COUNT(*) c FROM dorm_rooms WHERE status=
 $occupancyRate = $totalRooms > 0 ? round(($occupied / $totalRooms) * 100) : 0;
 
 $rooms = $db->query("
-  SELECT r.*,
-       (SELECT COUNT(*) FROM tenants t2 WHERE t2.room_id = r.room_id AND t2.status = 'Active') AS occupancy_count,
+    SELECT r.*,
+      (SELECT COUNT(*) FROM tenants t2 WHERE t2.room_id = r.room_id AND t2.status = 'Active') AS occupancy_count,
+      (SELECT COUNT(*) FROM tenants t3 WHERE t3.room_id = r.room_id AND t3.status IN ('Active','Pending')) +
+      (SELECT COUNT(*) FROM room_reservations rr WHERE rr.room_id = r.room_id AND rr.status IN ('Pending','Confirmed')) AS allocation_count,
        u.first_name, u.last_name
     FROM dorm_rooms r
     LEFT JOIN tenants t ON t.room_id = r.room_id AND t.status = 'Active'
@@ -195,7 +201,7 @@ render_module_tabs([
   <div class="row g-4 mt-0" id="rooms">
     <div class="col-lg-8">
       <div class="panel">
-        <?php $availableRooms = array_filter($rooms, fn($r) => in_array($r['status'], ['Available', 'Occupied'], true) && (int) $r['occupancy_count'] < (int) $r['capacity']); ?>
+        <?php $availableRooms = array_filter($rooms, fn($r) => $r['status'] !== 'Under Maintenance' && (int) $r['allocation_count'] < (int) $r['capacity']); ?>
         <div class="panel-header"><h2>Available Rooms</h2><span class="text-muted small"><?= count($availableRooms) ?> ready to assign</span></div>
         <?php if (!$availableRooms): ?><p class="text-muted text-center py-4">No available rooms right now.</p><?php endif; ?>
         <div class="room-grid">

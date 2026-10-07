@@ -62,8 +62,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif (!$validPair->fetch()) {
             flash('error', 'That contract could not be found for this tenant — it may have changed since the page loaded. Please refresh and try again.');
         } else {
-            $db->prepare('INSERT INTO payments (contract_id, tenant_id, payment_amount, payment_for_month, payment_date, due_date, payment_status, payment_method) VALUES (?,?,?,?,CURDATE(),CURDATE(),"Paid",?)')
+            $db->prepare('INSERT INTO payments (contract_id, tenant_id, payment_amount, payment_for_month, payment_date, paid_at, due_date, payment_status, payment_method) VALUES (?,?,?,?,CURDATE(),NOW(),CURDATE(),"Paid",?)')
                ->execute([$contractId, $tenantId, $amount, $forMonth, $method ?: 'Cash']);
+            $paymentId = (int) $db->lastInsertId();
+            send_payment_invoice($db, $paymentId);
+            log_action('payment_recorded', 'Recorded payment #' . $paymentId . ' of ' . peso($amount) . ' for tenant #' . $tenantId . ' (' . $forMonth . ')');
             log_activity($db, 'payment_recorded', 'Payment of ' . peso($amount) . ' recorded for ' . $forMonth, $tenantId);
             flash('success', 'Payment recorded.');
         }
@@ -221,8 +224,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif ($newStatus === 'Paid' && !in_array($paymentRow['payment_status'], ['Pending', 'Overdue'], true)) {
             flash('error', 'That payment is ' . $paymentRow['payment_status'] . ' and can\'t be marked Paid directly. Record a new payment for the tenant instead if they paid in cash.');
         } else {
-            $db->prepare('UPDATE payments SET payment_status = ?, payment_date = IF(? = "Paid", CURDATE(), payment_date) WHERE payment_id = ?')
-               ->execute([$newStatus, $newStatus, $paymentId]);
+            $db->prepare('UPDATE payments SET payment_status = ?, payment_date = IF(? = "Paid", CURDATE(), payment_date), paid_at = IF(? = "Paid", COALESCE(paid_at, NOW()), paid_at) WHERE payment_id = ?')
+              ->execute([$newStatus, $newStatus, $newStatus, $paymentId]);
+            if ($newStatus === 'Paid' && $paymentRow['payment_status'] !== 'Paid') {
+              send_payment_invoice($db, $paymentId);
+            }
+            log_action('payment_status_changed', 'Changed payment #' . $paymentId . ' status from ' . $paymentRow['payment_status'] . ' to ' . $newStatus);
             log_activity($db, 'payment_verified', 'Payment #' . $paymentId . ' marked as ' . $newStatus, $paymentTenantId);
             flash('success', 'Payment marked as ' . $newStatus . '.');
         }

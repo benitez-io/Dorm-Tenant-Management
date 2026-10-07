@@ -38,4 +38,5 @@ require_once __DIR__ . '/paymongo.php';
 require_once __DIR__ . '/../includes/functions.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/email.php';
+require_once __DIR__ . '/../includes/payment_invoice.php';
 require_once __DIR__ . '/../includes/paymongo.php';

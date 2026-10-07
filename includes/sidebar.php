@@ -32,6 +32,7 @@ $tenantLinks = [
     ['<i class="bi bi-tools"></i>', 'Maintenance', '/tenant/maintenance.php'],
     ['<i class="bi bi-bell-fill"></i>', 'Notifications', '/tenant/notifications.php'],
     ['<i class="bi bi-person-fill"></i>', 'Profile', '/tenant/profile.php'],
+    ['<i class="bi bi-bug-fill"></i>', 'Report a Bug', '/report_bug.php'],
 ];
 ?>
 <nav class="sidebar no-scrollbar" id="sidebar">

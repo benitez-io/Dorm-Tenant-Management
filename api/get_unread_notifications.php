@@ -57,57 +57,46 @@ try {
 
     $database = get_db();
 
-    $getCutoff = function (string $key): string {
-        $value = $_GET[$key] ?? 0;
-        $timestamp = is_numeric($value) ? max(0, (int) floor((float) $value / 1000)) : 0;
-        return date('Y-m-d H:i:s', $timestamp);
-    };
-
-    $cutoffs = [
-        'tenants' => $getCutoff('last_seen_tenants'),
-        'payments' => $getCutoff('last_seen_payments'),
-        'maintenance' => $getCutoff('last_seen_maintenance'),
-        'notifications' => $getCutoff('last_seen_notifications'),
-    ];
-
     $counts = $emptyCounts;
 
     if (in_array($role, ['super_admin', 'admin'], true)) {
         // Admin: Pending tenant approvals
         $counts['tenants'] = notification_count(
             $database,
-            "SELECT COUNT(*) FROM tenants WHERE approval_status = 'Pending' AND date_registered > ?",
-            [$cutoffs['tenants']]
+            "SELECT COUNT(*) FROM tenants WHERE approval_status = 'Pending'",
+            []
         );
 
         // Admin: Pending payments to review
         $counts['payments'] = notification_count(
             $database,
-            "SELECT COUNT(*) FROM payments WHERE payment_status = 'Pending' AND created_at > ?",
-            [$cutoffs['payments']]
+            "SELECT COUNT(*) FROM payments WHERE payment_status IN ('Pending', 'Overdue')",
+            []
         );
 
         // Admin: Pending or active maintenance requests needing attention
         $counts['maintenance'] = notification_count(
             $database,
-            "SELECT COUNT(*) FROM maintenance_requests
-             WHERE status IN ('Pending', 'Ongoing')
-             AND date_submitted > ?",
-            [$cutoffs['maintenance']]
+            "SELECT COUNT(*) FROM maintenance_requests WHERE is_resolved = 0",
+            []
         );
 
         // Informational announcements use the notification dot.
         $counts['announcements'] = notification_count(
             $database,
-            "SELECT COUNT(*) FROM notifications WHERE type = 'Announcement' AND date_sent > ?",
-            [$cutoffs['notifications']]
+                        "SELECT COUNT(*) FROM notifications n
+                         LEFT JOIN notification_reads nr ON nr.notification_id = n.notification_id AND nr.user_id = ?
+                         WHERE n.type = 'Announcement' AND nr.seen_at IS NULL",
+            [$userId]
         );
 
         // Direct alerts require review and use the number badge.
         $counts['notifications'] = notification_count(
             $database,
-            "SELECT COUNT(*) FROM notifications WHERE type <> 'Announcement' AND date_sent > ?",
-            [$cutoffs['notifications']]
+                        "SELECT COUNT(*) FROM notifications n
+                         LEFT JOIN notification_reads nr ON nr.notification_id = n.notification_id AND nr.user_id = ?
+                         WHERE n.type <> 'Announcement' AND nr.seen_at IS NULL",
+            [$userId]
         );
 
     } elseif ($role === 'tenant') {
@@ -141,53 +130,37 @@ try {
                 }
             }
 
-            // Use status timestamps when supported, while remaining compatible with older schemas.
-            $hasUpdatedAt = notification_count(
-                $database,
-                "SELECT COUNT(*) FROM information_schema.COLUMNS
-                 WHERE TABLE_SCHEMA = DATABASE()
-                 AND TABLE_NAME = 'maintenance_requests'
-                 AND COLUMN_NAME = 'updated_at'",
-                []
-            ) > 0;
-
-            $maintenanceQuery = $hasUpdatedAt
-                ? "SELECT COUNT(*) FROM maintenance_requests
-                   WHERE tenant_id = ?
-                         AND status IN ('Pending', 'Ongoing', 'Completed')
-                   AND (date_submitted > ? OR COALESCE(updated_at, date_submitted) > ?)"
-                : "SELECT COUNT(*) FROM maintenance_requests
-                   WHERE tenant_id = ?
-                         AND status IN ('Pending', 'Ongoing', 'Completed')
-                   AND date_submitted > ?";
-            $maintenanceParameters = $hasUpdatedAt
-                ? [$tenantId, $cutoffs['maintenance'], $cutoffs['maintenance']]
-                : [$tenantId, $cutoffs['maintenance']];
-
             $counts['maintenance'] = notification_count(
                 $database,
-                $maintenanceQuery,
-                $maintenanceParameters
+                "SELECT COUNT(*) FROM maintenance_requests m
+                 LEFT JOIN maintenance_reads mr ON mr.maintenance_id = m.maintenance_id AND mr.tenant_id = m.tenant_id
+                 WHERE m.tenant_id = ? AND m.is_resolved = 0 AND m.updated_at IS NOT NULL
+                   AND (mr.seen_updated_at IS NULL OR m.updated_at > mr.seen_updated_at)",
+                [$tenantId]
             );
 
             // Pending or overdue bills need tenant attention.
             $counts['payments'] = notification_count(
                 $database,
-                "SELECT COUNT(*) FROM payments WHERE tenant_id = ? AND payment_status IN ('Pending', 'Overdue') AND created_at > ?",
-                [$tenantId, $cutoffs['payments']]
+                "SELECT COUNT(*) FROM payments WHERE tenant_id = ? AND payment_status IN ('Pending', 'Overdue')",
+                [$tenantId]
             );
 
             // Target notifications to this tenant or their room.
             $targetFilter = "(target_type = 'all' OR (target_type = 'tenant' AND target_value = ?) OR (target_type = 'room' AND FIND_IN_SET(?, REPLACE(target_value, ' ', ''))))";
             $counts['announcements'] = notification_count(
                 $database,
-                "SELECT COUNT(*) FROM notifications WHERE type = 'Announcement' AND date_sent > ? AND {$targetFilter}",
-                [$cutoffs['notifications'], (string) $tenantId, $roomNumber]
+                "SELECT COUNT(*) FROM notifications n
+                 LEFT JOIN notification_reads nr ON nr.notification_id = n.notification_id AND nr.user_id = ?
+                 WHERE n.type = 'Announcement' AND {$targetFilter} AND nr.seen_at IS NULL",
+                [$userId, (string) $tenantId, $roomNumber]
             );
             $counts['notifications'] = notification_count(
                 $database,
-                "SELECT COUNT(*) FROM notifications WHERE type <> 'Announcement' AND date_sent > ? AND {$targetFilter}",
-                [$cutoffs['notifications'], $tenantId, $roomNumber]
+                "SELECT COUNT(*) FROM notifications n
+                 LEFT JOIN notification_reads nr ON nr.notification_id = n.notification_id AND nr.user_id = ?
+                 WHERE n.type <> 'Announcement' AND {$targetFilter} AND nr.seen_at IS NULL",
+                [$userId, $tenantId, $roomNumber]
             );
         }
     }

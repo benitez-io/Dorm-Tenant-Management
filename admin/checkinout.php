@@ -5,10 +5,41 @@ require_role('admin');
 $db = get_db();
 $selfPath = '/admin/checkinout.php';
 require __DIR__ . '/../includes/tenant_action_handler.php';
+$search = str_input($_GET, 'q');
+$statusFilter = str_input($_GET, 'status', 'all');
+$statusOptions = ['all', 'Active', 'Checked Out'];
+if (!in_array($statusFilter, $statusOptions, true)) {
+  $statusFilter = 'all';
+}
 
 $checkedIn  = (int) $db->query("SELECT COUNT(*) c FROM tenants WHERE status = 'Active'")->fetch()['c'];
 $checkedOut = (int) $db->query("SELECT COUNT(*) c FROM tenants WHERE status = 'Checked Out'")->fetch()['c'];
 $keysOut    = (int) $db->query("SELECT COUNT(*) c FROM tenants WHERE status = 'Checked Out' AND key_returned = FALSE")->fetch()['c'];
+
+$statusCounts = ['Active' => 0, 'Checked Out' => 0];
+$countRows = $db->query("SELECT status, COUNT(*) c FROM tenants
+  WHERE status IN ('Active','Checked Out')
+    AND tenant_id NOT IN (SELECT tenant_id FROM dismissed_records WHERE page = 'checkinout')
+  GROUP BY status")->fetchAll();
+foreach ($countRows as $row) {
+  $statusCounts[$row['status']] = (int) $row['c'];
+}
+
+$where = [
+  "t.status IN ('Active','Checked Out')",
+  "t.tenant_id NOT IN (SELECT tenant_id FROM dismissed_records WHERE page = 'checkinout')",
+];
+$params = [];
+if ($statusFilter !== 'all') {
+  $where[] = 't.status = ?';
+  $params[] = $statusFilter;
+}
+if ($search !== '') {
+  $where[] = '(u.first_name LIKE ? OR u.last_name LIKE ? OR u.email LIKE ? OR r.room_number LIKE ?)';
+  $like = '%' . $search . '%';
+  array_push($params, $like, $like, $like, $like);
+}
+$whereSql = 'WHERE ' . implode(' AND ', $where);
 
 $result = paginate(
     $db,
@@ -16,11 +47,14 @@ $result = paginate(
      FROM tenants t
      JOIN users u ON u.user_id = t.user_id
      LEFT JOIN dorm_rooms r ON r.room_id = t.room_id
-     WHERE t.status IN ('Active','Checked Out')
-       AND t.tenant_id NOT IN (SELECT tenant_id FROM dismissed_records WHERE page = 'checkinout')
-     ORDER BY FIELD(t.status,'Active','Checked Out'), t.checkin_date DESC",
-    "SELECT COUNT(*) c FROM tenants t WHERE t.status IN ('Active','Checked Out')
-       AND t.tenant_id NOT IN (SELECT tenant_id FROM dismissed_records WHERE page = 'checkinout')"
+   $whereSql
+   ORDER BY FIELD(t.status,'Active','Checked Out'), t.checkin_date DESC",
+  "SELECT COUNT(*) c FROM tenants t
+   JOIN users u ON u.user_id = t.user_id
+   LEFT JOIN dorm_rooms r ON r.room_id = t.room_id
+   $whereSql",
+  $params,
+  10
 );
 $records = $result['rows'];
 
@@ -38,6 +72,7 @@ render_module_tabs([
   ['key' => 'registration', 'label' => 'Registration & Approval', 'href' => '/admin/tenants.php'],
   ['key' => 'status', 'label' => 'Track Status', 'href' => '/admin/tenant-status.php'],
   ['key' => 'checkin', 'label' => 'Check-in / Check-out', 'href' => '/admin/checkinout.php'],
+  ['key' => 'reservations', 'label' => 'Reservations', 'href' => '/admin/reservations.php'],
 ], 'checkin'); ?>
 
 <div class="stat-grid stat-grid-3">
@@ -49,29 +84,34 @@ render_module_tabs([
 <div class="panel mt-2">
   <div class="panel-header">
     <h2>All Records</h2>
-    <?php if ($records): ?>
-    <div class="dropdown">
-      <button class="btn btn-sm btn-action-outline dropdown-toggle" type="button" data-bs-toggle="dropdown"><i class="bi bi-eraser-fill"></i> Clear</button>
-      <ul class="dropdown-menu dropdown-menu-end">
-        <li><h6 class="dropdown-header">Clear from this view only</h6></li>
-        <li><form method="post" onsubmit="return confirm('Clear Checked In records from this view? They stay in the database for reports.');"><?= csrf_field() ?><input type="hidden" name="action" value="clear_view"><input type="hidden" name="page" value="checkinout"><input type="hidden" name="filter" value="Active"><button class="dropdown-item" type="submit">Clear Checked In only</button></form></li>
-        <li><form method="post" onsubmit="return confirm('Clear Checked Out records from this view? They stay in the database for reports.');"><?= csrf_field() ?><input type="hidden" name="action" value="clear_view"><input type="hidden" name="page" value="checkinout"><input type="hidden" name="filter" value="Checked Out"><button class="dropdown-item" type="submit">Clear Checked Out only</button></form></li>
-        <li><hr class="dropdown-divider"></li>
-        <li><form method="post" onsubmit="return confirm('Clear ALL records from this view? They stay in the database for reports.');"><?= csrf_field() ?><input type="hidden" name="action" value="clear_view"><input type="hidden" name="page" value="checkinout"><input type="hidden" name="filter" value="all"><button class="dropdown-item" type="submit">Clear all</button></form></li>
-      </ul>
+  </div>
+  <div class="filter-toolbar">
+    <form class="search-box" method="get">
+      <i class="bi bi-search"></i>
+      <?php if ($statusFilter !== 'all'): ?><input type="hidden" name="status" value="<?= clean($statusFilter) ?>"><?php endif; ?>
+      <input type="search" name="q" value="<?= clean($search) ?>" placeholder="Search tenant, email, room…" class="form-control form-control-sm">
+    </form>
+    <div class="filter-pills">
+      <?php foreach ($statusOptions as $key):
+          $label = $key === 'all' ? 'All' : ($key === 'Active' ? 'Checked In' : $key);
+          $count = $key === 'all' ? array_sum($statusCounts) : $statusCounts[$key];
+          $query = http_build_query(array_filter(['status' => $key === 'all' ? null : $key, 'q' => $search ?: null]));
+      ?>
+        <a href="?<?= clean($query) ?>" class="filter-pill <?= $statusFilter === $key ? 'active' : '' ?>"><?= clean($label) ?> <span class="pill-count"><?= $count ?></span></a>
+      <?php endforeach; ?>
     </div>
-    <?php endif; ?>
+    <span class="filter-result-count"><?= $result['total'] ?> result<?= $result['total'] === 1 ? '' : 's' ?></span>
   </div>
   <div class="table-responsive">
-    <table class="table app-table align-middle">
+    <table class="table app-table tenant-management-table align-middle">
       <thead><tr><th>Tenant</th><th>Room</th><th>Check-in Date</th><th>Check-out Date</th><th>Key Return</th><th>Status</th><th class="text-end">Actions</th></tr></thead>
       <tbody>
-      <?php if (!$records): ?><tr><td colspan="7" class="text-center text-muted py-4">No check-in records yet.</td></tr><?php endif; ?>
+      <?php if (!$records): ?><tr><td colspan="7" class="text-center text-muted py-4"><?= $statusFilter === 'all' && $search === '' ? 'No check-in records yet.' : 'No records match this filter.' ?></td></tr><?php endif; ?>
       <?php foreach ($records as $t): ?>
         <tr>
           <td>
             <div class="cell-person">
-              <div class="user-avatar-md" style="color:var(--maroon);background:var(--maroon-soft);"><?= clean(strtoupper(substr($t['first_name'], 0, 1))) ?></div>
+              <div class="applicant-avatar"><i class="bi bi-person-fill" aria-hidden="true"></i></div>
               <div><?= clean($t['first_name'] . ' ' . $t['last_name']) ?></div>
             </div>
           </td>

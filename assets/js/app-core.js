@@ -48,8 +48,6 @@
         ? '../api/get_unread_notifications.php'
         : 'api/get_unread_notifications.php';
 
-      const tabs = ['tenants', 'payments', 'maintenance', 'notifications'];
-
       const badgeSelectors = {
         tenants: '[data-badge-type="badge-tenants"], #nav-badge-tenants',
         payments: '[data-badge-type="badge-payments"], #nav-badge-payments',
@@ -73,66 +71,8 @@
         return Array.from(document.querySelectorAll(dotSelector));
       };
 
-      const hideIndicator = function (tab) {
-        try {
-          getBadgeElements(tab).forEach(function (badge) {
-            badge.textContent = '0';
-            setIndicatorVisible(badge, false);
-          });
-          if (tab === 'notifications') {
-            getNotificationDots().forEach(function (dot) { setIndicatorVisible(dot, false); });
-          }
-        } catch (error) {
-          console.warn('Notification indicator update skipped:', error);
-        }
-      };
-
-      const markTabSeen = function (tab) {
-        try {
-          localStorage.setItem('last_seen_' + tab, String(Date.now()));
-        } catch (error) {
-          /* Storage disabled fallback */
-        }
-        hideIndicator(tab);
-      };
-
-      const pathTabs = {
-        '/admin/tenants.php': 'tenants',
-        '/admin/tenant-status.php': 'tenants',
-        '/admin/checkinout.php': 'tenants',
-        '/admin/payments.php': 'payments',
-        '/tenant/payments.php': 'payments',
-        '/admin/maintenance.php': 'maintenance',
-        '/tenant/maintenance.php': 'maintenance',
-        '/admin/notifications.php': 'notifications',
-        '/tenant/notifications.php': 'notifications'
-      };
-
-      // Bind click handlers to sidebar links so badges clear when user clicks to open
-      document.querySelectorAll('.sidebar a[href], .sidebar .nav-link[href]').forEach(function (link) {
-        if (!link) return;
-        try {
-          const linkPath = new URL(link.href, window.location.href).pathname;
-          const tab = Object.keys(pathTabs).find(function (path) { return linkPath.endsWith(path); });
-          if (tab) {
-            link.addEventListener('click', function () {
-              markTabSeen(pathTabs[tab]);
-            });
-          }
-        } catch (error) {
-          console.warn('Sidebar link tracking skipped:', error);
-        }
-      });
-
-      // Construct timestamp query string
-      const query = tabs.map(function (tab) {
-        let value = '';
-        try { value = localStorage.getItem('last_seen_' + tab) || ''; } catch (e) { value = ''; }
-        return value ? 'last_seen_' + tab + '=' + encodeURIComponent(value) : '';
-      }).filter(Boolean).join('&');
-
       // Fetch updated counts
-      fetch(relativeApiUrl + (query ? '?' + query : ''), {
+      fetch(relativeApiUrl, {
         headers: { 'X-Requested-With': 'XMLHttpRequest' }
       })
         .then(function (response) {

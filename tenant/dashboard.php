@@ -9,6 +9,8 @@ $tenant = current_tenant();
 if (!$tenant || $tenant['approval_status'] !== 'Approved') {
     $pageTitle = 'Home';
     include __DIR__ . '/../includes/header.php';
+    require_once __DIR__ . '/../includes/page_header.php';
+    render_page_header('bi-house-door-fill', 'Home', 'Welcome to your dorm portal.', null, 'Tenant Portal', '/tenant/dashboard.php');
     if ($tenant && $tenant['approval_status'] === 'Rejected') {
         ?>
         <div class="pending-screen">
@@ -87,27 +89,11 @@ foreach ($recentPayments as $p) {
 
 $pageTitle = 'Home';
 include __DIR__ . '/../includes/header.php';
+require_once __DIR__ . '/../includes/page_header.php';
 ?>
-<h1 class="mb-0">Hello, <?= clean($_SESSION['first_name']) ?>!</h1>
-<p class="text-muted">Welcome to your dorm portal.</p>
+<?php render_page_header('bi-house-door-fill', 'Home', 'Welcome, ' . $_SESSION['first_name'] . '. Here is your dorm overview.', null, 'Tenant Portal', '/tenant/dashboard.php'); ?>
 
 <?php if ($room): ?>
-<div class="room-banner">
-  <div class="room-banner-top">
-    <div>
-      <div class="text-uppercase small opacity-75">Your Room</div>
-      <div class="room-banner-number">Room <?= clean($room['room_number']) ?></div>
-    </div>
-    <?php if ($contract): ?>
-      <div class="text-end">
-        <div class="text-uppercase small opacity-75">Contract <?= $contractExpired ? 'Ended' : 'Ends' ?></div>
-        <div><?= clean(date('F j, Y', strtotime($contract['contract_end']))) ?></div>
-      </div>
-    <?php endif; ?>
-  </div>
-  <div class="room-banner-rate-bar"><span>Monthly Rent</span><strong><?= peso($room['monthly_rate']) ?></strong></div>
-</div>
-
 <?php
 // ---- This month's rent, at a glance --------------------------------
 // Driven entirely by the payments table: once a payment for this month
